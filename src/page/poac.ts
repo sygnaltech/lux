@@ -4,6 +4,8 @@
  */
 
 import { IRouteHandler } from "@sygnal/sse";
+import Cookies from "js-cookie";
+import { Popup } from "src/popup";
  
 
 export class PoacPage implements IRouteHandler {
@@ -84,12 +86,30 @@ console.log("exec");
                 console.log(widget); 
                 widget.showPopupFrame('book');
               });
-          });
+          }); 
           
       };
       d.head.appendChild(script);
     })(window, document, 'script', 'sbw_0kr3c2');
-  
+
+    /**
+     * Handle CarePatron clicks 
+     */
+
+    document.querySelectorAll('[book="cp"]').forEach(element => {
+      element.addEventListener('click', (event) => {
+        event.preventDefault(); // Prevent the default anchor click behavior
+        
+        const url = (element as HTMLAnchorElement).href;
+        const popup = new Popup(url, { width: 1000 });
+        popup.show();
+      });
+    });
+
+    // Create a session cookie named 'poac' with value 'true' using js-cookie
+Cookies.set('poac', 'true');
+
   }
 
 }
+
