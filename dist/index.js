@@ -1,7 +1,7 @@
 "use strict";
 (() => {
   // src/version.ts
-  var VERSION = "0.1.13";
+  var VERSION = "0.1.14";
 
   // node_modules/flatpickr/dist/esm/types/options.js
   var HOOKS = [
@@ -11784,7 +11784,7 @@
           popup.show();
         });
       });
-      api.set("poac", "true");
+      localStorage.setItem("poac", "true");
     }
   };
 
@@ -11795,7 +11795,7 @@
     setup() {
     }
     exec() {
-      if (api.get("poac")) {
+      if (localStorage.getItem("poac")) {
         document.querySelectorAll('[conditional="poac"]').forEach((element) => {
           element.style.setProperty("display", "block", "important");
         });

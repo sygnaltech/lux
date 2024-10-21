@@ -107,7 +107,8 @@ console.log("exec");
     });
 
     // Create a session cookie named 'poac' with value 'true' using js-cookie
-Cookies.set('poac', 'true');
+// Cookies.set('poac', 'true');
+    localStorage.setItem('poac', 'true');
 
   }
 

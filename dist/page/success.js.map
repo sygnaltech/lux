@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../../src/page/success.ts"],
+  "sourcesContent": ["\r\n/*\r\n * Page | Success \r\n */\r\n\r\nimport { IRouteHandler } from \"@sygnal/sse\";\r\nimport Cookies from \"js-cookie\";\r\n\r\n\r\nexport class SuccessPage implements IRouteHandler {\r\n\r\n  constructor() {\r\n  }\r\n\r\n  setup() {\r\n        \r\n  }\r\n\r\n  exec() {\r\n\r\n    \r\n\r\n    // if (Cookies.get('poac')) {\r\n    //   document.querySelectorAll('[conditional=\"poac\"]').forEach(element => {\r\n    //     (element as HTMLElement).style.setProperty('display', 'block', 'important');\r\n    //   });\r\n    // } \r\n\r\n    // Check for the existence of the 'poac' value in localStorage and update elements accordingly\r\n    if (localStorage.getItem('poac')) {\r\n      document.querySelectorAll('[conditional=\"poac\"]').forEach(element => {\r\n        (element as HTMLElement).style.setProperty('display', 'block', 'important');\r\n      });\r\n    }\r\n\r\n    // Create a session cookie named 'poac' with value 'true' using js-cookie\r\n// Cookies.set('poac', 'true');\r\n\r\n  }\r\n\r\n}\r\n\r\n"],
+  "mappings": ";;;AASO,MAAM,cAAN,MAA2C;AAAA,IAEhD,cAAc;AAAA,IACd;AAAA,IAEA,QAAQ;AAAA,IAER;AAAA,IAEA,OAAO;AAWL,UAAI,aAAa,QAAQ,MAAM,GAAG;AAChC,iBAAS,iBAAiB,sBAAsB,EAAE,QAAQ,aAAW;AACnE,UAAC,QAAwB,MAAM,YAAY,WAAW,SAAS,WAAW;AAAA,QAC5E,CAAC;AAAA,MACH;AAAA,IAKF;AAAA,EAEF;",
+  "names": []
+}
