@@ -4,6 +4,7 @@
  */
 
 import { IRouteHandler, Page } from "@sygnal/sse";
+import posthog from "posthog-js";
  
 
 export class ServicesPage implements IRouteHandler {
@@ -39,6 +40,11 @@ console.log("services page");
     document.querySelectorAll<HTMLAnchorElement>('a[href$=".mp4"]').forEach((link) => {
         link.addEventListener('click', (event: Event) => {
             event.preventDefault(); // Prevent the default action
+
+            // Log PostHog event  
+            posthog.capture("media-popup", {
+              media: "3d4d" 
+            });   
 
             const videoUrl = link.href; // Get the video URL from the link
 
