@@ -11773,7 +11773,7 @@
           popup.show();
         });
       });
-      api.set("poac", "true");
+      localStorage.setItem("poac", "true");
     }
   };
 
@@ -11784,7 +11784,7 @@
     setup() {
     }
     exec() {
-      if (api.get("poac")) {
+      if (localStorage.getItem("poac")) {
         document.querySelectorAll('[conditional="poac"]').forEach((element) => {
           element.style.setProperty("display", "block", "important");
         });
