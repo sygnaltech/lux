@@ -17,6 +17,7 @@ import { TestWfuIfPage } from "./page/test-wfu-if";
 import { Site } from "./site";
 import { ServicesPage } from "./page/services";
 import { PoacPage } from "./page/poac";
+import { SuccessPage } from "./page/success";
 
 export const routeDispatcher = (): RouteDispatcher => {
     
@@ -27,6 +28,7 @@ export const routeDispatcher = (): RouteDispatcher => {
         '/': HomePage,
         '/scan': MaternityScanCalcPage,
         '/poac': PoacPage,
+        '/book/success': SuccessPage, 
         '/services/*': ServicesPage,
 
         // TEST Pages
