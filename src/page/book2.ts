@@ -4,6 +4,7 @@
  */
 
 import { IRouteHandler } from "@sygnal/sse";
+import { Accordion } from "../components/accordion";
 
 
 export class Book2Page implements IRouteHandler {
@@ -71,6 +72,26 @@ export class Book2Page implements IRouteHandler {
     // Set up "when" radio buttons
     this.setupWhenRadios();
 
+    // Initialize accordion
+    this.setupAccordion();
+
+  }
+
+  private setupAccordion() {
+    // Check if accordion exists on the page
+    const accordionContainer = document.querySelector('[data-accordion]');
+    if (!accordionContainer) {
+      return; // No accordion on this page
+    }
+
+    // Initialize with custom settings
+    new Accordion('[data-accordion]', {
+      speed: 300,
+      oneOpen: true,
+      offsetAnchor: true,
+      offsetFromTop: 180,
+      scrollTopDelay: 400
+    });
   }
 
   private setupWhenRadios() {
