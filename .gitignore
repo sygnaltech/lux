@@ -3,4 +3,5 @@ node_modules
 .DS_STORE
 
 dist/
+.chrome-profile/
 
