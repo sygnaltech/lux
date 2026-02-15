@@ -68,6 +68,48 @@ export class Book2Page implements IRouteHandler {
       this.updateFilteredSelect(select as HTMLSelectElement, collectionList, filterControl.value);
     });
 
+    // Set up "when" radio buttons
+    this.setupWhenRadios();
+
+  }
+
+  private setupWhenRadios() {
+    // Find all radio buttons with name="when"
+    const whenRadios = document.querySelectorAll<HTMLInputElement>('input[type="radio"][name="when"]');
+
+    // Set weekday as default checked
+    whenRadios.forEach(radio => {
+      if (radio.value === 'weekday') {
+        radio.checked = true;
+      }
+    });
+
+    // Add change event listeners
+    whenRadios.forEach(radio => {
+      radio.addEventListener('change', () => {
+        if (radio.checked) {
+          this.updateWhenSections(radio.value);
+        }
+      });
+    });
+
+    // Initial show/hide based on default selection
+    this.updateWhenSections('weekday');
+  }
+
+  private updateWhenSections(whenValue: string | null) {
+    // Find all sections with show-when attribute
+    const sections = document.querySelectorAll('[show-when]');
+
+    sections.forEach(section => {
+      const showWhen = section.getAttribute('show-when');
+
+      if (showWhen === whenValue) {
+        (section as HTMLElement).style.display = '';
+      } else {
+        (section as HTMLElement).style.display = 'none';
+      }
+    });
   }
 
   private populateSelect(select: HTMLSelectElement, collectionList: Element, filterValue?: string) {
