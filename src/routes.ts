@@ -10,7 +10,7 @@
  * 
  */
 
-import { MaternityScanCalcPage } from "./page/maternityScanCalc"; 
+import { MaternityScanCalcPage } from "./page/maternityScanCalc";
 import { HomePage } from "./page/home";
 import { RouteDispatcher } from "@sygnal/sse";
 import { TestWfuIfPage } from "./page/test-wfu-if";
@@ -18,6 +18,7 @@ import { Site } from "./site";
 import { ServicesPage } from "./page/services";
 import { PoacPage } from "./page/poac";
 import { SuccessPage } from "./page/success";
+import { Book2Page } from "./page/book2";
 
 export const routeDispatcher = (): RouteDispatcher => {
     
@@ -28,11 +29,12 @@ export const routeDispatcher = (): RouteDispatcher => {
         '/': HomePage,
         '/scan': MaternityScanCalcPage,
         '/poac': PoacPage,
-        '/book/success': SuccessPage, 
+        '/book-2': Book2Page,
+        '/book/success': SuccessPage,
         '/services/*': ServicesPage,
 
         // TEST Pages
-        '/test/wfu-if': TestWfuIfPage, 
+        '/test/wfu-if': TestWfuIfPage,
 
     };
 //    routeDispatcher.execRoute(); 
