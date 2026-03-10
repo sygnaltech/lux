@@ -16,8 +16,9 @@ export function initDateFields(): void {
     flatpickr(input, {
       dateFormat: 'Y-m-d',
       altInput: true,
-      altFormat: 'd M Y',
+      altFormat: 'd/m/Y',
       allowInput: true,
+      maxDate: 'today',
       disableMobile: true,
     });
   });
