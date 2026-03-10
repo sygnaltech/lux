@@ -28,6 +28,22 @@ export class Site implements IRouteHandler {
 
     this.monitorPosthogClickEvents();
     initDateFields();
+    this.initFillFields();
+
+  }
+
+  initFillFields() {
+
+    document.querySelectorAll<HTMLElement>('[source]').forEach((source) => {
+      source.addEventListener('change', () => {
+        const key = source.getAttribute('source');
+        const el = source as HTMLSelectElement;
+        const value = el.selectedOptions?.[0]?.text ?? el.value;
+        document.querySelectorAll<HTMLInputElement>(`[data-fill-field="${key}"]`).forEach((target) => {
+          target.value = value;
+        });
+      });
+    });
 
   }
 
