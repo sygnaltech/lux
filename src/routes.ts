@@ -29,6 +29,7 @@ export const routeDispatcher = (): RouteDispatcher => {
         '/': HomePage,
         '/scan': MaternityScanCalcPage,
         '/poac': PoacPage,
+        '/book': Book2Page,
         '/book-2': Book2Page,
         '/book/success': SuccessPage,
         '/services/*': ServicesPage,

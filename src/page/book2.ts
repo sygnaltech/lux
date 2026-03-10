@@ -73,12 +73,41 @@ export class Book2Page implements IRouteHandler {
     // Set up "when" radio buttons
     this.setupWhenRadios();
 
+    // Set up call-only service visibility
+    this.setupCallOnly();
+
     // Initialize accordion
     this.setupAccordion();
 
     // Initialize booking widget
     this.setupBookingWidget();
 
+  }
+
+  private setupCallOnly() {
+    const serviceSelect = document.querySelector('select[name="service-item"]') as HTMLSelectElement;
+    if (!serviceSelect) return;
+
+    serviceSelect.addEventListener('change', () => this.updateCallOnlyVisibility(serviceSelect));
+    this.updateCallOnlyVisibility(serviceSelect);
+  }
+
+  private updateCallOnlyVisibility(serviceSelect: HTMLSelectElement) {
+    const selectedOption = serviceSelect.options[serviceSelect.selectedIndex];
+    const isCallOnly = selectedOption?.getAttribute('call-only') === 'true';
+
+    // Elements with book-step-section class but no book-step attribute = normal booking steps
+    const bookingSteps = document.querySelectorAll('.book-step-section:not([book-step])');
+    // The call-only message div
+    const callOnlySection = document.querySelector('[book-step="call-only"]');
+
+    bookingSteps.forEach(el => {
+      (el as HTMLElement).style.display = isCallOnly ? 'none' : '';
+    });
+
+    if (callOnlySection) {
+      (callOnlySection as HTMLElement).style.display = isCallOnly ? '' : 'none';
+    }
   }
 
   private setupAccordion() {
@@ -98,8 +127,26 @@ export class Book2Page implements IRouteHandler {
     });
   }
 
+  /**
+   * Get current booking parameters from page state
+   * Returns the selected category, service, and provider IDs
+   */
+  public getBookingParams(): { category?: string; service?: string; provider?: string } {
+    const params: { category?: string; service?: string; provider?: string } = {};
+
+    // Get service SimplyBook ID from the selected service-item option
+    const serviceSelect = document.querySelector('select[name="service-item"]') as HTMLSelectElement;
+    if (serviceSelect && serviceSelect.selectedIndex >= 0) {
+      const selectedOption = serviceSelect.options[serviceSelect.selectedIndex];
+      const sbmId = selectedOption?.getAttribute('sbm-service-id');
+      if (sbmId) params.service = sbmId;
+    }
+
+    return params;
+  }
+
   private setupBookingWidget() {
-    // Initialize SimplyBook widget
+    // Initialize SimplyBook widget with callback to get dynamic parameters
     new Simplybook({
       url: "https://luxradiology.simplybook.me",
       button_title: "Book now",
@@ -124,7 +171,9 @@ export class Book2Page implements IRouteHandler {
         show_sidebar: "1",
         sb_busy: "#b3b3b3",
         sb_available: "#ffdee8"
-      }
+      },
+      // Callback to get dynamic booking parameters from page state
+      getParameters: () => this.getBookingParams()
     });
   }
 
@@ -186,6 +235,14 @@ export class Book2Page implements IRouteHandler {
         option.value = value;
         option.textContent = name;
         option.setAttribute('data-dynamic', 'true'); // Mark as dynamically added
+
+        // Copy sbm-service-id and call-only from data element to option
+        const sbmId = dataElement.getAttribute('sbm-service-id');
+        if (sbmId) option.setAttribute('sbm-service-id', sbmId);
+
+        const callOnly = dataElement.getAttribute('call-only');
+        if (callOnly !== null) option.setAttribute('call-only', callOnly);
+
         select.appendChild(option);
       }
     });

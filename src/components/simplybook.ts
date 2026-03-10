@@ -29,10 +29,16 @@ export interface SimplybookThemeSettings {
   sb_available?: string;
 }
 
+export interface SimplybookPredefined {
+  category?: string;    // Integer ID as string
+  service?: string;     // Integer ID as string
+  provider?: string;    // Integer ID as string
+}
+
 export interface SimplybookAppConfig {
   clear_session?: number;
   allow_switch_to_ada?: number;
-  predefined?: any[];
+  predefined?: SimplybookPredefined | any[];  // Object or array (for backwards compatibility)
 }
 
 export interface SimplybookConfig {
@@ -50,6 +56,12 @@ export interface SimplybookConfig {
   button_position?: string;
   button_position_offset?: string;
   container_id?: string;
+
+  // Dynamic parameter support
+  category?: string;                        // Optional: Default category ID
+  service?: string;                         // Optional: Default service ID
+  provider?: string;                        // Optional: Default provider ID
+  getParameters?: () => SimplybookPredefined; // Optional: Callback to get dynamic parameters
 }
 
 // Extend Window interface for SimplybookWidget
@@ -60,8 +72,9 @@ declare global {
 }
 
 export class Simplybook {
-  private config: SimplybookConfig;
-  private widget: any;
+  private baseConfig: SimplybookConfig;
+  private currentWidget: any = null;
+  private lastParameters: SimplybookPredefined = {};
   private static scriptLoaded: boolean = false;
   private static scriptLoading: boolean = false;
   private static loadCallbacks: Array<() => void> = [];
@@ -101,7 +114,7 @@ export class Simplybook {
     app_config: {
       clear_session: 1,
       allow_switch_to_ada: 0,
-      predefined: []
+      predefined: {}
     }
   };
 
@@ -110,8 +123,8 @@ export class Simplybook {
       throw new Error('SimplyBook: url is required in configuration');
     }
 
-    // Merge user config with defaults
-    this.config = {
+    // Merge user config with defaults (store as base config)
+    this.baseConfig = {
       ...Simplybook.DEFAULT_CONFIG,
       ...userConfig,
       theme_settings: {
@@ -130,7 +143,7 @@ export class Simplybook {
   private async init(): Promise<void> {
     try {
       await this.loadScript();
-      this.createWidget();
+      // Don't create widget here - wait until first click
       this.bindClickEvents();
     } catch (error) {
       console.error('SimplyBook initialization failed:', error);
@@ -179,17 +192,68 @@ export class Simplybook {
     });
   }
 
-  private createWidget(): void {
+  private createWidget(parameters?: SimplybookPredefined): void {
     if (!window.SimplybookWidget) {
       console.error('SimplybookWidget is not available');
       return;
     }
 
     try {
-      this.widget = new window.SimplybookWidget(this.config);
+      // Build widget config with parameters
+      const widgetConfig = { ...this.baseConfig };
+
+      // Merge predefined parameters
+      if (parameters && (parameters.category || parameters.service || parameters.provider)) {
+        const predefined: SimplybookPredefined = {};
+        if (parameters.category) predefined.category = parameters.category;
+        if (parameters.service) predefined.service = parameters.service;
+        if (parameters.provider) predefined.provider = parameters.provider;
+
+        widgetConfig.app_config = {
+          ...widgetConfig.app_config,
+          predefined
+        };
+
+        // Store last parameters for comparison
+        this.lastParameters = predefined;
+      }
+
+      // Create new widget instance
+      this.currentWidget = new window.SimplybookWidget(widgetConfig);
     } catch (error) {
       console.error('Failed to create SimplyBook widget:', error);
     }
+  }
+
+  /**
+   * Extract booking parameters from element data attributes and config callback
+   */
+  private extractParameters(element: Element): SimplybookPredefined {
+    const params: SimplybookPredefined = {};
+
+    // Priority 1: Button data attributes
+    const category = element.getAttribute('data-category');
+    const service = element.getAttribute('data-service');
+    const provider = element.getAttribute('data-provider');
+
+    if (category) params.category = category;
+    if (service) params.service = service;
+    if (provider) params.provider = provider;
+
+    // Priority 2: Callback function (if no button attributes)
+    if (!params.category && !params.service && !params.provider && this.baseConfig.getParameters) {
+      const callbackParams = this.baseConfig.getParameters();
+      if (callbackParams.category) params.category = callbackParams.category;
+      if (callbackParams.service) params.service = callbackParams.service;
+      if (callbackParams.provider) params.provider = callbackParams.provider;
+    }
+
+    // Priority 3: Component defaults (if still no params)
+    if (!params.category && this.baseConfig.category) params.category = this.baseConfig.category;
+    if (!params.service && this.baseConfig.service) params.service = this.baseConfig.service;
+    if (!params.provider && this.baseConfig.provider) params.provider = this.baseConfig.provider;
+
+    return params;
   }
 
   private bindClickEvents(): void {
@@ -204,6 +268,14 @@ export class Simplybook {
     bookButtons.forEach(element => {
       element.addEventListener('click', (e) => {
         e.preventDefault();
+
+        // Extract current parameters
+        const params = this.extractParameters(element);
+
+        // Recreate widget with current parameters
+        this.createWidget(params);
+
+        // Show popup
         this.showBookingPopup();
       });
     });
@@ -215,8 +287,8 @@ export class Simplybook {
    * Programmatically show the booking popup
    */
   public showBookingPopup(): void {
-    if (this.widget && typeof this.widget.showPopupFrame === 'function') {
-      this.widget.showPopupFrame('book');
+    if (this.currentWidget && typeof this.currentWidget.showPopupFrame === 'function') {
+      this.currentWidget.showPopupFrame('book');
     } else {
       console.error('Widget not initialized or showPopupFrame method not available');
     }
@@ -226,7 +298,7 @@ export class Simplybook {
    * Get the widget instance for advanced usage
    */
   public getWidget(): any {
-    return this.widget;
+    return this.currentWidget;
   }
 
   /**

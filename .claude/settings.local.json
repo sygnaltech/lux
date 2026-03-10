@@ -6,7 +6,10 @@
       "mcp__chrome-devtools__take_snapshot",
       "mcp__chrome-devtools__take_screenshot",
       "mcp__chrome-devtools__list_console_messages",
-      "mcp__chrome-devtools__wait_for"
+      "mcp__chrome-devtools__wait_for",
+      "mcp__havoc__spec_write_work",
+      "Read(//d/Projects/Engines/derby-dental/.netlify/**)",
+      "Read(//d/Projects/Engines/derby-dental/**)"
     ]
   }
 }
