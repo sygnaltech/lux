@@ -5,6 +5,7 @@
 
 import { IRouteHandler, Page } from "@sygnal/sse";
 import posthog from 'posthog-js'
+import { initDateFields } from './components/date-field';
 // import { loadEngineCSS } from "./engine/core";
 
 // import gsap from 'gsap'; 
@@ -25,7 +26,8 @@ export class Site implements IRouteHandler {
 
   exec() {
 
-    this.monitorPosthogClickEvents(); 
+    this.monitorPosthogClickEvents();
+    initDateFields();
 
   }
 
