@@ -11,7 +11,7 @@
     "esbuild": "esbuild ./src/*.ts --bundle --sourcemap --outdir=dist --watch",
     "format": "prettier src/*.ts -w",
     "deploy": "npm run build && netlify deploy --prod --site 014364fe-88d4-4aa0-9019-dd9037b5e36e",
-    "deploy:test": "npm run build && netlify deploy --site 729a2630-9b25-4b84-a5f7-c5ebe5ae970e"
+    "deploy:test": "npm run build && netlify deploy --prod --site 729a2630-9b25-4b84-a5f7-c5ebe5ae970e"
   },
   "repository": {
     "type": "git",

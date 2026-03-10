@@ -73,8 +73,8 @@ export class Book2Page implements IRouteHandler {
     // Set up "when" radio buttons
     this.setupWhenRadios();
 
-    // Set up call-only service visibility
-    this.setupCallOnly();
+    // Set up booking-type service visibility
+    this.setupBookingType();
 
     // Initialize accordion
     this.setupAccordion();
@@ -84,29 +84,41 @@ export class Book2Page implements IRouteHandler {
 
   }
 
-  private setupCallOnly() {
+  private setupBookingType() {
     const serviceSelect = document.querySelector('select[name="service-item"]') as HTMLSelectElement;
     if (!serviceSelect) return;
 
-    serviceSelect.addEventListener('change', () => this.updateCallOnlyVisibility(serviceSelect));
-    this.updateCallOnlyVisibility(serviceSelect);
+    serviceSelect.addEventListener('change', () => this.updateBookingTypeSections(serviceSelect));
+    this.updateBookingTypeSections(serviceSelect);
   }
 
-  private updateCallOnlyVisibility(serviceSelect: HTMLSelectElement) {
+  private updateBookingTypeSections(serviceSelect: HTMLSelectElement) {
     const selectedOption = serviceSelect.options[serviceSelect.selectedIndex];
-    const isCallOnly = selectedOption?.getAttribute('call-only') === 'true';
 
-    // Elements with book-step-section class but no book-step attribute = normal booking steps
+    // Read booking-type, falling back to call-only for backward compatibility
+    let bookingType = selectedOption?.getAttribute('booking-type') ?? '';
+    if (!bookingType && selectedOption?.getAttribute('call-only') === 'true') {
+      bookingType = 'Phone';
+    }
+
+    const isPhone = bookingType === 'Phone';
+    const isWaitlist = bookingType === 'Waitlist';
+    const isDefault = !isPhone && !isWaitlist;
+
     const bookingSteps = document.querySelectorAll('.book-step-section:not([book-step])');
-    // The call-only message div
     const callOnlySection = document.querySelector('[book-step="call-only"]');
+    const waitlistSection = document.querySelector('[book-step="waitlist"]');
 
     bookingSteps.forEach(el => {
-      (el as HTMLElement).style.display = isCallOnly ? 'none' : '';
+      (el as HTMLElement).style.display = isDefault ? '' : 'none';
     });
 
     if (callOnlySection) {
-      (callOnlySection as HTMLElement).style.display = isCallOnly ? '' : 'none';
+      (callOnlySection as HTMLElement).style.display = isPhone ? '' : 'none';
+    }
+
+    if (waitlistSection) {
+      (waitlistSection as HTMLElement).style.display = isWaitlist ? '' : 'none';
     }
   }
 
@@ -236,12 +248,15 @@ export class Book2Page implements IRouteHandler {
         option.textContent = name;
         option.setAttribute('data-dynamic', 'true'); // Mark as dynamically added
 
-        // Copy sbm-service-id and call-only from data element to option
+        // Copy sbm-service-id, call-only, and booking-type from data element to option
         const sbmId = dataElement.getAttribute('sbm-service-id');
         if (sbmId) option.setAttribute('sbm-service-id', sbmId);
 
         const callOnly = dataElement.getAttribute('call-only');
         if (callOnly !== null) option.setAttribute('call-only', callOnly);
+
+        const bookingType = dataElement.getAttribute('booking-type');
+        if (bookingType !== null) option.setAttribute('booking-type', bookingType);
 
         select.appendChild(option);
       }
