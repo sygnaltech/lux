@@ -1,16 +1,15 @@
+functionsDirectory = "D:\\Projects\\Clients\\lux\\netlify\\functions"
+functionsDirectoryOrigin = "default"
 plugins = []
 headers = []
 redirects = []
-
-[functions]
-
-[functions."*"]
 
 [build]
 publish = "D:\\Projects\\Clients\\lux\\dist"
 publishOrigin = "ui"
 commandOrigin = "ui"
 command = "npm run build"
+functions = "D:\\Projects\\Clients\\lux\\netlify\\functions"
 
 [build.environment]
 
@@ -25,3 +24,7 @@ command = "npm run build"
 [build.processing.js]
 
 [build.services]
+
+[functions]
+
+[functions."*"]
