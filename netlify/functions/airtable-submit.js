@@ -57,9 +57,13 @@ exports.handler = async (event) => {
     };
   }
 
-  // Strip all _ prefixed control fields, pass the rest to Airtable
+  // Build ignore set: all _-prefixed control fields + any listed in _ignore
+  const ignoreSet = new Set(
+    (body._ignore ?? '').split(',').map((s) => s.trim()).filter(Boolean)
+  );
+
   const fields = Object.fromEntries(
-    Object.entries(body).filter(([key]) => !key.startsWith('_'))
+    Object.entries(body).filter(([key]) => !key.startsWith('_') && !ignoreSet.has(key))
   );
 
   let airtableRes;
