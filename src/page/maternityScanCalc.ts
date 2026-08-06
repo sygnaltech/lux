@@ -193,8 +193,11 @@ export class MaternityScanCalcPage implements IRouteHandler {
          * Progress
          */
 
-        const weeks = Math.floor(maternityCalc.dayOf / 7);
-        const days = maternityCalc.dayOf % 7;
+        // Exact gestational age today (LMP = 0w0d), so "X weeks Y days" matches
+        // the standard convention the scan-window dates are built on.
+        const currentDay = maternityCalc.gestationDays;
+        const weeks = Math.floor(currentDay / 7);
+        const days = currentDay % 7;
 
         // Format the date in a readable format
         const readableDate = this._edd.toLocaleDateString('en-NZ', {
@@ -213,15 +216,13 @@ export class MaternityScanCalcPage implements IRouteHandler {
 
         this.updateDisplayValues(data);
 
-        const maternityWeek = maternityCalc.weekOf; 
-
         /**
          * Calc service week-dates
          */
 
         this.calculateAndDisplayTimelineWeekDates(
             maternityCalc
-        ); 
+        );
 
 
         /**
@@ -231,7 +232,7 @@ export class MaternityScanCalcPage implements IRouteHandler {
          *   - calc display area 
          */
 
-        this.updateVisibilityBasedOnWeek(maternityWeek); 
+        this.updateVisibilityBasedOnWeek(maternityCalc);
 
 
         /**
@@ -294,41 +295,55 @@ export class MaternityScanCalcPage implements IRouteHandler {
 
       }
 
-    updateVisibilityBasedOnWeek(maternityWeek: number) {
+    updateVisibilityBasedOnWeek(calc: MaternityCalc) {
+        // The patient's exact gestational age today, in days from the LMP.
+        // Cards are shown/hidden by comparing this against each card's window,
+        // using the SAME gestational-age tokens ("W" / "W.D") and day maths as
+        // the displayed start/end dates -- so a card is visible for exactly the
+        // window it prints. (The old code parseInt'd the tokens, dropping the
+        // "5" in "13.5", and compared against a coarse 1-indexed week counter,
+        // which hid the nuchal card ~a week before its real deadline.)
+        const currentDay = calc.gestationDays;
+
         const elements = document.querySelectorAll<HTMLElement>('[min-week], [max-week]');
-    
-//        let displayCards = 0; 
+
         elements.forEach(element => {
-            const minWeek = element.getAttribute('min-week');
-            const maxWeek = element.getAttribute('max-week');
+            const minToken = element.getAttribute('min-week');
+            const maxToken = element.getAttribute('max-week');
             const displayRule = element.getAttribute('display-rule') || 'current';
+
+            // Window start day (from min-week) and end day (from max-week).
+            // A whole-week max is an inclusive range end (e.g. "24" -> 24w6d);
+            // a max carrying days is an exact milestone (e.g. "13.5" -> 13w5d).
+            const startG = minToken ? MaternityCalc.parseGestationToken(minToken) : null;
+            const endG = maxToken ? MaternityCalc.parseGestationToken(maxToken) : null;
+            const startDay = startG ? startG.weeks * 7 + startG.days : null;
+            const endDay = endG ? endG.weeks * 7 + endG.days + (endG.hasDays ? 0 : 6) : null;
+
             let hide = false;
-    
+
             switch (displayRule) {
                 case 'current':
-                    if ((minWeek && maternityWeek < parseInt(minWeek)) ||
-                        (maxWeek && maternityWeek > parseInt(maxWeek))) {
+                    if ((startDay !== null && currentDay < startDay) ||
+                        (endDay !== null && currentDay > endDay)) {
                         hide = true;
                     }
                     break;
                 case 'future':
-                    if (minWeek && maternityWeek >= parseInt(minWeek)) {
+                    if (startDay !== null && currentDay >= startDay) {
                         hide = true;
                     }
                     break;
                 case 'past':
-                    if (maxWeek && maternityWeek <= parseInt(maxWeek)) {
+                    if (endDay !== null && currentDay <= endDay) {
                         hide = true;
                     }
                     break;
             }
-    
-            // if(!hide)
-            //     displayCards += 1;
-//            element.parentElement?.removeChild(element); //.remove();
+
             element.style.display = hide ? 'none' : '';
             if(hide)
-                element.remove(); 
+                element.remove();
         });
 
         // Remove empty card groups

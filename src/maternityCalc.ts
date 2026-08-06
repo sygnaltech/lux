@@ -68,7 +68,18 @@ export class MaternityCalc {
 
       const weeks = Math.floor(this.dayOf / 7);
 
-      return weeks + 1; 
+      return weeks + 1;
+    }
+
+    // Gestational age today, in whole days since the LMP, using the standard
+    // convention where the LMP is day 0 (0w0d). This is the day-precise basis
+    // for both the "X weeks Y days" progress and the card show/hide logic.
+    // Math.round keeps this correct across NZ daylight-saving transitions
+    // (where a local day is 23 or 25 hours long).
+    get gestationDays(): number {
+      const today = DateTime.local().startOf('day');
+      const lmp = DateTime.fromJSDate(this.lmpDate).startOf('day');
+      return Math.round(today.diff(lmp, 'days').days);
     }
 
     // getDayDate(day: number): Date {
