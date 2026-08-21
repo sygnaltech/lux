@@ -89,6 +89,15 @@ export class Book2Page implements IRouteHandler {
     if (!serviceSelect) return;
 
     serviceSelect.addEventListener('change', () => this.updateBookingTypeSections(serviceSelect));
+
+    // Changing the category repopulates the service select and resets it to its
+    // placeholder, but assigning selectedIndex fires no change event - so re-run
+    // the gate here too, otherwise stale steps stay on screen.
+    const categorySelect = document.querySelector('select[name="service"]') as HTMLSelectElement;
+    if (categorySelect) {
+      categorySelect.addEventListener('change', () => this.updateBookingTypeSections(serviceSelect));
+    }
+
     this.updateBookingTypeSections(serviceSelect);
   }
 
@@ -105,30 +114,37 @@ export class Book2Page implements IRouteHandler {
     const isWaitlist = bookingType === 'Waitlist';
     const isDefault = !isPhone && !isWaitlist;
 
+    // Nothing chosen yet is distinct from "default booking type" - both selects
+    // sit on a value="" placeholder until the user picks. Without this, an empty
+    // booking-type reads as isDefault and every step below step 1 is revealed,
+    // letting a visitor reach the scheduler without Phone/Waitlist routing.
+    const categorySelect = document.querySelector('select[name="service"]') as HTMLSelectElement;
+    const hasSelection = !!categorySelect?.value && !!serviceSelect.value;
+
     const bookingSteps = document.querySelectorAll('.book-step-section:not([book-step])');
     const callOnlySection = document.querySelector('[book-step="call-only"]');
     const waitlistSection = document.querySelector('[book-step="waitlist"]');
 
     bookingSteps.forEach(el => {
-      (el as HTMLElement).style.display = isDefault ? '' : 'none';
+      (el as HTMLElement).style.display = hasSelection && isDefault ? '' : 'none';
     });
 
     if (callOnlySection) {
-      (callOnlySection as HTMLElement).style.display = isPhone ? '' : 'none';
+      (callOnlySection as HTMLElement).style.display = hasSelection && isPhone ? '' : 'none';
     }
 
     if (waitlistSection) {
-      (waitlistSection as HTMLElement).style.display = isWaitlist ? '' : 'none';
+      (waitlistSection as HTMLElement).style.display = hasSelection && isWaitlist ? '' : 'none';
     }
 
     const referralSection = document.querySelector('[book-step="referral"]');
     if (referralSection) {
-      (referralSection as HTMLElement).style.display = isWaitlist ? '' : 'none';
+      (referralSection as HTMLElement).style.display = hasSelection && isWaitlist ? '' : 'none';
     }
 
     const prepareSection = document.querySelector('[book-step="prepare"]');
     if (prepareSection) {
-      (prepareSection as HTMLElement).style.display = isWaitlist ? '' : 'none';
+      (prepareSection as HTMLElement).style.display = hasSelection && isWaitlist ? '' : 'none';
     }
   }
 
@@ -242,9 +258,14 @@ export class Book2Page implements IRouteHandler {
     // Get all data elements from the collection list
     let dataElements = Array.from(collectionList.querySelectorAll('[name][value]'));
 
-    // Apply category filter if provided
-    if (filterValue) {
-      dataElements = dataElements.filter(el => el.getAttribute('category') === filterValue);
+    // undefined = this select isn't filtered at all -> all options.
+    // ''        = filter applies but no category chosen yet -> no options.
+    // Both are falsy, so a truthiness check here would list every service
+    // before a category is picked.
+    if (filterValue !== undefined) {
+      dataElements = filterValue
+        ? dataElements.filter(el => el.getAttribute('category') === filterValue)
+        : [];
     }
 
     // Create options from data elements
@@ -288,6 +309,10 @@ export class Book2Page implements IRouteHandler {
 
     // Repopulate with filtered data
     this.populateSelect(select, collectionList, filterValue);
+
+    // An enabled dropdown holding only its placeholder is a dead end - make the
+    // dependency on the category visible instead of something you discover by clicking.
+    select.disabled = !filterValue;
   }
 
 }
