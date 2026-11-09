@@ -90,6 +90,88 @@ No files changed. Want me to write this up into [EMAIL-BLOCKED.hd](vscode-webvie
 
 [https://admin.google.com/u/1/ac/apps/gmail/authenticateemail](https://admin.google.com/u/1/ac/apps/gmail/authenticateemail)
 
+# Client rollout tracker
+
+Audited 2026-11-09. Every domain below is on the same Cloudflare nameserver pair (`ram` / `eleanor`) and runs Google Workspace for mail, so the shape of the fix is identical each time — only the extra third-party senders differ.
+
+> [!NOTE]
+> `ponsonbydoctrors.co.nz` does not resolve — no NS, no records. The live domain is **`ponsonbydoctors.co.nz`** and that is what is tracked here.
+
+## Status matrix
+
+| Domain | SPF | DKIM | DMARC | Headers verified | Priority |
+| --- | --- | --- | --- | --- | --- |
+| luxradiology.co.nz | ✅ | ✅ google + mailjet | ✅ | ✅ 2026-11-09 | — done |
+| ponsonbydoctors.co.nz | ❌ missing | ⚠️ brevo only | ✅ Brevo-managed | ☐ | High |
+| sygnal.com | ❌ missing | ❌ missing | ❌ missing | ☐ | High |
+| sonusear.co.nz | ❌ missing | ✅ google present | ❌ missing | ☐ | High |
+| lapelle.co.nz | ✅ present | ❌ missing | ❌ missing | ☐ | Medium |
+
+**Legend** — ✅ correct and aligned · ⚠️ present but incomplete for the Google sending path · ❌ absent.
+
+## Records to set
+
+DKIM values are generated per-domain in the Google Admin console and can't be written ahead of time; everything else is the literal TXT value to paste into Cloudflare.
+
+| Domain | Record | Type | Value | Done |
+| --- | --- | --- | --- | --- |
+| luxradiology.co.nz | `@` | TXT | `v=spf1 include:_spf.google.com include:spf.mailjet.com ~all` | ✅ |
+| luxradiology.co.nz | `google._domainkey` | TXT | *(from Google Admin — set, signing confirmed)* | ✅ |
+| luxradiology.co.nz | `_dmarc` | TXT | `v=DMARC1; p=none; rua=mailto:dmarc@luxradiology.co.nz; fo=1` | ✅ |
+| ponsonbydoctors.co.nz | `@` | TXT | `v=spf1 include:_spf.google.com include:spf.brevo.com ~all` | ☐ |
+| ponsonbydoctors.co.nz | `google._domainkey` | TXT | *(generate in Google Admin)* | ☐ |
+| ponsonbydoctors.co.nz | `_dmarc` | TXT | *(already present — see note below)* | — |
+| sygnal.com | `@` | TXT | `v=spf1 include:_spf.google.com ~all` | ☐ |
+| sygnal.com | `google._domainkey` | TXT | *(generate in Google Admin)* | ☐ |
+| sygnal.com | `_dmarc` | TXT | `v=DMARC1; p=none; rua=mailto:dmarc@sygnal.com; fo=1` | ☐ |
+| sonusear.co.nz | `@` | TXT | `v=spf1 include:_spf.google.com ~all` | ☐ |
+| sonusear.co.nz | `google._domainkey` | TXT | *(already present — confirm it is signing)* | — |
+| sonusear.co.nz | `_dmarc` | TXT | `v=DMARC1; p=none; rua=mailto:dmarc@sonusear.co.nz; fo=1` | ☐ |
+| lapelle.co.nz | `@` | TXT | *(already correct — `v=spf1 include:_spf.google.com -all`)* | — |
+| lapelle.co.nz | `google._domainkey` | TXT | *(generate in Google Admin)* | ☐ |
+| lapelle.co.nz | `_dmarc` | TXT | `v=DMARC1; p=none; rua=mailto:dmarc@lapelle.co.nz; fo=1` | ☐ |
+
+> [!IMPORTANT]
+> Each `rua` mailbox or alias has to actually exist, or the aggregate reports bounce and `p=none` buys nothing. Confirm before moving any domain to `p=quarantine`.
+
+## Per-domain notes
+
+**ponsonbydoctors.co.nz** — sends through **both** Google Workspace and Brevo. Brevo's DKIM is already wired up (`brevo1` / `brevo2` CNAMEs) and Brevo published the DMARC record, pointing `rua` at its own collector. That record satisfies Microsoft's existence check, but there is **no SPF record at all** and no Google DKIM selector — so anything sent from Google Workspace authenticates on nothing. This is the worst of the set in practice, because the existing DMARC record makes it *look* configured. Optionally widen the reports to a mailbox you control: `v=DMARC1; p=none; rua=mailto:dmarc@ponsonbydoctors.co.nz,mailto:rua@dmarc.brevo.com; fo=1`.
+
+**sygnal.com** — nothing at all: no SPF, no DKIM, no DMARC. Before committing the SPF value above, confirm whether anything other than Google Workspace sends as `@sygnal.com` (invoicing, app notifications, forms). Anything missed will start softfailing the moment the record goes in.
+
+**sonusear.co.nz** — Google DKIM is published (valid RSA-2048) but there is no SPF and no DMARC, so none of it currently counts. Worth confirming the DKIM is actually *signing* and not just published — check the headers of a test message for `s=google`, not a `gappssmtp.com` fallback.
+
+**lapelle.co.nz** — SPF is already correct and uses a hard `-all`. Note that with no DKIM, SPF is the only authentication, and `-all` means **forwarded mail hard-fails**. Adding the Google DKIM selector is what makes `-all` safe rather than risky.
+
+## How to verify each one
+
+Run against the authoritative nameserver, then confirm on a live message. All read-only.
+
+```bash
+dig +short @ram.ns.cloudflare.com <domain> TXT | grep spf1
+dig +short @ram.ns.cloudflare.com _dmarc.<domain> TXT
+dig +short @ram.ns.cloudflare.com google._domainkey.<domain> TXT
+```
+
+DNS alone cannot prove DKIM is live — publishing the record and clicking **Start authentication** in Google Admin are separate actions. The only proof is the `Authentication-Results` header on a message sent *after* the change:
+
+```
+dkim=pass   header.i=@<domain>  header.s=google
+spf=pass    smtp.mailfrom=<user>@<domain>
+dmarc=pass  header.from=<domain>
+```
+
+If `header.i` still reads `…gappssmtp.com`, the record is published but Google has not switched over yet.
+
+## Working order per domain
+
+1. Publish SPF and DMARC in Cloudflare — two minutes, and DMARC alone stops the Outlook rejections.
+2. Generate the DKIM record in Google Admin, publish it, then click **Start authentication**.
+3. Send a test message to a Gmail address and read the headers for the three passes above.
+4. Send a test to the affected outlook.com recipient to close the loop. Microsoft may cache the old negative DMARC lookup for up to an hour — wait and retry before assuming a fault.
+5. After a few weeks of clean aggregate reports, tighten `p=none` → `p=quarantine`, and `~all` → `-all`.
+
 <p></p>
 
 <p></p>
