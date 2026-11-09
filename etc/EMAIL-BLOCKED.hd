@@ -9,6 +9,7 @@ However, they successfully sent a message to me from [info@luxradiology.co.nz](m
 
 I have a suspicion this might be specific to [outlook.com](http://outlook.com) recipients. Here's what they're seeing.
 
+
 ![image-1.png](image-1.png)
 
 # Work
@@ -16,6 +17,78 @@ I have a suspicion this might be specific to [outlook.com](http://outlook.com) r
 I need you to check current status of [outlook.com](http://outlook.com) services, and see if there is a known problem that has been causing this for people today.
 
 I need you to check the dkim, and spf records for [luxradiology.co.nz](http://luxradiology.co.nz) And let me know if there's anything I need to repair.
+
+
+# Notes
+
+Read the brief and the bounce screenshot, then checked Outlook's status and Lux's live DNS. Short version: **there is a real Outlook-side change, but Lux's domain is genuinely misconfigured — it would be rejected even without it.**
+
+## 1\. Outlook.com status
+
+Not an outage. Microsoft's consumer mail (outlook.com / hotmail.com / live.com / msn.com) started hard-rejecting mail from domains with no DMARC record on **5 November 2026**, unannounced. The exact bounce in your screenshot — `550 5.7.1 Message rejected: Message lacks SPF/DKIM/DMARC Auth Records (AS9031519)` — is the signature of it, and is being reported widely since that date. Microsoft has not acknowledged it or given a timeline. Some reports claim even correctly-configured domains get intermittently hit; Lux is not one of those cases.
+
+So: your suspicion was right — it's outlook.com-specific. But it's a tightening of enforcement, not a fault that will clear on its own.
+
+## 2\. Lux's actual records — all three fail
+
+```
+SPF    v=spf1 include:spf.mailjet.com ?all     ← Google not included; ?all = neutral
+DKIM   google._domainkey                       ← DOES NOT EXIST
+       mailjet._domainkey                      ← exists, fine
+DMARC  _dmarc.luxradiology.co.nz               ← DOES NOT EXIST
+MX     Google Workspace
+DNS    Cloudflare (ram/eleanor.ns.cloudflare.com)
+```
+
+I pulled the headers from the message they sent you on 8 Nov to confirm the send path:
+
+```
+spf=neutral (209.85.220.41 is neither permitted nor denied by domain of info@luxradiology.co.nz)
+dkim=pass header.i=@luxradiology-co-nz.20260707.gappssmtp.com
+```
+
+That `gappssmtp.com` domain is Google's **fallback** signing key — it's what Google uses when a tenant has never turned on DKIM. It passes, but it doesn't match `luxradiology.co.nz`, so it is **unaligned** and authenticates nothing for DMARC purposes.
+
+They send through Google Workspace, but the SPF record only authorises Mailjet. Net result from Microsoft's side: no SPF pass, no aligned DKIM pass, no DMARC record. The rejection is correct.
+
+Your message got through because Gmail tolerates neutral SPF and absent DMARC. Microsoft no longer does — and Yahoo/AOL are heading the same way, so this needs fixing regardless.
+
+## 3\. What to repair (all in Cloudflare DNS)
+
+**a. Turn on Google Workspace DKIM** — this one can't be done from DNS alone. In the Google Admin console: *Apps → Google Workspace → Gmail → Authenticate email*, select the domain, **Generate new record** (2048-bit, selector `google`), publish the TXT it gives you, then click **Start authentication**.
+
+| Type | Name | Value |
+| --- | --- | --- |
+| TXT | `google._domainkey` | *(the value Google generates — I can't produce it)* |
+
+**b. Replace the SPF record** (edit the existing one — never add a second `v=spf1`):
+
+```
+v=spf1 include:_spf.google.com include:spf.mailjet.com ~all
+```
+
+Adds Google, keeps Mailjet, and moves `?all` (neutral — authenticates nothing) to `~all` (softfail). Tighten to `-all` later once DMARC reports confirm nothing else sends as the domain.
+
+**c. Add DMARC:**
+
+| Type | Name | Value |
+| --- | --- | --- |
+| TXT | `_dmarc` | `v=DMARC1; p=none; rua=mailto:dmarc@luxradiology.co.nz; fo=1` |
+
+`p=none` is monitor-only — it changes nothing about how mail is treated, it just publishes the policy Microsoft is demanding. Make sure `dmarc@luxradiology.co.nz` actually exists as a mailbox or alias first, or point `rua` at one that does. After a few weeks of reports, move to `p=quarantine`.
+
+**Order:** do (b) and (c) immediately — they're a two-minute Cloudflare change and (c) alone should stop the Outlook bounces. Do (a) same day; without it the domain is relying on SPF alone, which breaks on any forwarded mail. Proxy status is irrelevant for TXT records. Expect propagation in minutes on Cloudflare, but Microsoft may cache a negative DMARC lookup for an hour or so.
+
+**Also worth asking Lux:** what is Mailjet actually sending for them? If it's dormant, drop the include and shrink the attack surface.
+
+Sources: [db8 — Outlook/Hotmail reject email without DMARC](https://db8.nl/en/blog/outlook-hotmail-rejects-email-without-dmarc), [Windows Latest — Outlook.com silently missing emails since Nov 5](https://www.windowslatest.com/2026/11/08/your-outlook-com-inbox-may-be-silently-missing-emails-since-nov-5-and-even-senders-with-valid-settings-are-getting-blocked/), [Microsoft Q&A — 550 5.7.1 Message lacks SPF/DKIM/DMARC](https://learn.microsoft.com/en-us/answers/questions/6063832/senders-receiving-error-message-550-5-7-1-message), [MailRoute — Outlook.com quietly rejecting email without DMARC](https://mailroute.net/blog/outlook-rejecting-email-without-dmarc)
+
+No files changed. Want me to write this up into [EMAIL-BLOCKED.hd](vscode-webview://10389kl819n1oq007gbgo29djitavetbhtbp555f5ks7h8gvggue/etc/EMAIL-BLOCKED.hd) as a findings section you can forward to Lux?
+
+
+# Process
+
+[https://admin.google.com/u/1/ac/apps/gmail/authenticateemail](https://admin.google.com/u/1/ac/apps/gmail/authenticateemail)
 
 <p></p>
 
