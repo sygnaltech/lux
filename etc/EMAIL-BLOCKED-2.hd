@@ -1,0 +1,101 @@
+---
+id: 3IhhUN56limbJm3BOBrgQt
+title: "Email authentication — rentingauckland.co.nz"
+format-version: 2
+date: 2026-11-09
+---
+
+# Email authentication — rentingauckland.co.nz
+
+Separate client, same job as the other tracker. Audited 2026-11-09.
+
+## Background
+
+Since **5 November 2026** Microsoft's consumer mail (outlook.com / hotmail.com / live.com / msn.com) hard-rejects mail from domains that publish no DMARC record, with:
+
+```
+550 5.7.1 Message rejected: Message lacks SPF/DKIM/DMARC Auth Records (AS9031519)
+```
+
+The change was unannounced and Microsoft has not acknowledged it. Gmail and most other receivers still tolerate an unauthenticated domain, so the symptom shows up only for outlook.com recipients — which is why it reads as "their email is broken" rather than "our DNS is wrong".
+
+## Current state
+
+| | Finding |
+| --- | --- |
+| DNS host | Cloudflare (`ram` / `eleanor` nameservers) |
+| Mail platform | Google Workspace |
+| SPF | ❌ **no record** |
+| DKIM | ❌ **no selector published** |
+| DMARC | ❌ **no record** |
+
+The domain publishes **no TXT records at all**. Nothing authenticates, which means mail to outlook.com is being rejected today and anything else arriving is doing so on the receiver's goodwill.
+
+Mail currently signs with Google's `…gappssmtp.com` fallback key, which passes DKIM but is **unaligned** — it does not match the From domain, so it authenticates nothing for DMARC purposes. That is the default state for a Workspace tenant where DKIM was never switched on.
+
+## Records to set
+
+**✅ = in place and correct, nothing to do. ☐ = action needed.**
+
+| Record | Type | Value | Status |
+| --- | --- | --- | --- |
+| `@` | TXT | `v=spf1 include:_spf.google.com ~all` | ☐ add |
+| `google._domainkey` | TXT | *(generate in Google Admin — see below)* | ☐ add |
+| `_dmarc` | TXT | `v=DMARC1; p=none; rua=mailto:dmarc@rentingauckland.co.nz; fo=1` | ☐ add |
+
+> [!IMPORTANT]
+> Before publishing the SPF record, confirm whether anything **other than Google Workspace** sends as `@rentingauckland.co.nz` — a booking system, a CRM, listing-site notifications, website contact forms. There are no existing records to infer senders from, so nothing here is evidence of absence. Anything missed starts softfailing the moment the record goes in, and each extra sender needs its own `include:`.
+
+### Mailbox to create
+
+`dmarc@rentingauckland.co.nz` has to be deliverable or the aggregate reports bounce and `p=none` buys nothing. An alias on an existing Workspace mailbox is enough; use a Group if more than one person should see them. This does not affect mail delivery or the Outlook fix — it only affects whether you can see what is happening before tightening the policy.
+
+### DKIM
+
+Can't be done from DNS alone. In the Google Admin console: **Apps → Google Workspace → Gmail → Authenticate email**, select the domain, **Generate new record** (2048-bit, selector `google`), publish the TXT it produces in Cloudflare, then click **Start authentication**.
+
+Generating the record and starting authentication are **separate actions**. Publishing the TXT alone changes nothing — Google keeps signing with the `gappssmtp.com` fallback until authentication is started.
+
+## Working order
+
+1. Publish SPF and DMARC in Cloudflare — two minutes, and DMARC alone stops the Outlook rejections.
+2. Generate the DKIM record in Google Admin, publish it, then click **Start authentication**.
+3. Create the `dmarc@` alias.
+4. Send a test message to an address outside this Workspace tenant and read its headers.
+5. Send a test to the affected outlook.com recipient to close the loop. Microsoft may cache the old negative DMARC lookup for up to an hour — wait and retry before assuming a fault.
+6. After a few weeks of clean aggregate reports, tighten `p=none` → `p=quarantine`, then `~all` → `-all`.
+
+## How to verify
+
+Read-only, against the authoritative nameserver:
+
+```bash
+dig +short @ram.ns.cloudflare.com rentingauckland.co.nz TXT | grep spf1
+dig +short @ram.ns.cloudflare.com _dmarc.rentingauckland.co.nz TXT
+dig +short @ram.ns.cloudflare.com google._domainkey.rentingauckland.co.nz TXT
+```
+
+DNS alone cannot prove DKIM is live. The only proof is the `Authentication-Results` header on a message sent **after** the change:
+
+```
+dkim=pass   header.i=@rentingauckland.co.nz  header.s=google
+spf=pass    smtp.mailfrom=<user>@rentingauckland.co.nz
+dmarc=pass  header.from=rentingauckland.co.nz
+```
+
+If `header.i` still reads `…gappssmtp.com`, the record is published but Google has not switched over yet.
+
+> [!CAUTION]
+> A self-addressed test does not work. A message from one address to another inside the same Workspace tenant never crosses SMTP and gets no meaningful `Authentication-Results`. Send to an address outside the tenant, or wait for the first DMARC aggregate report.
+
+## Progress
+
+| Step | Status |
+| --- | --- |
+| SPF published | ☐ |
+| DKIM generated and published | ☐ |
+| DKIM **Start authentication** clicked | ☐ |
+| DMARC published | ☐ |
+| `dmarc@` alias created | ☐ |
+| Headers verified on a live message | ☐ |
+| outlook.com delivery confirmed | ☐ |

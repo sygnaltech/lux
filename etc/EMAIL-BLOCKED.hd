@@ -104,37 +104,62 @@ Last re-checked 2026-11-09.
 | Domain | SPF | DKIM | DMARC | Headers verified | Status |
 | --- | --- | --- | --- | --- | --- |
 | luxradiology.co.nz | ✅ | ✅ google + mailjet | ✅ | ✅ 2026-11-09 | Done |
-| ponsonbydoctors.co.nz | ✅ | ✅ google + brevo | ✅ Brevo-managed | ✅ 2026-11-09 | Done |
+| ponsonbydoctors.co.nz | ✅ | ✅ google + brevo | ⚠️ Brevo-only `rua` | ✅ 2026-11-09 | Mail OK, `rua` tweak |
 | lapelle.co.nz | ✅ | ✅ google | ✅ | ✅ 2026-11-09 | Done |
 | sygnal.com | ✅ | ✅ google | ✅ | ☐ no inbound test yet | DNS done |
 | sonusear.co.nz | ❌ missing | ✅ google present | ❌ missing | ☐ | **Outstanding** |
 
-**Legend** — ✅ correct and aligned · ⚠️ present but incomplete for the Google sending path · ❌ absent.
+**Legend** — ✅ correct and aligned · ⚠️ working, but worth improving · ❌ absent.
 
 ## Records to set
 
 DKIM values are generated per-domain in the Google Admin console and can't be written ahead of time; everything else is the literal TXT value to paste into Cloudflare.
 
-| Domain | Record | Type | Value | Done |
+**✅ = in place and correct, nothing to do. ☐ = action needed.**
+
+| Domain | Record | Type | Value | Status |
 | --- | --- | --- | --- | --- |
 | luxradiology.co.nz | `@` | TXT | `v=spf1 include:_spf.google.com include:spf.mailjet.com ~all` | ✅ |
 | luxradiology.co.nz | `google._domainkey` | TXT | *(from Google Admin — set, signing confirmed)* | ✅ |
 | luxradiology.co.nz | `_dmarc` | TXT | `v=DMARC1; p=none; rua=mailto:dmarc@luxradiology.co.nz; fo=1` | ✅ |
 | ponsonbydoctors.co.nz | `@` | TXT | `v=spf1 include:_spf.google.com include:spf.brevo.com ~all` | ✅ |
 | ponsonbydoctors.co.nz | `google._domainkey` | TXT | *(from Google Admin — set, signing confirmed)* | ✅ |
-| ponsonbydoctors.co.nz | `_dmarc` | TXT | *(Brevo-published — see note below)* | — |
+| ponsonbydoctors.co.nz | `_dmarc` | TXT | `v=DMARC1; p=none; rua=mailto:dmarc@ponsonbydoctors.co.nz,mailto:rua@dmarc.brevo.com; fo=1` | ☐ replace |
 | sygnal.com | `@` | TXT | `v=spf1 include:_spf.google.com ~all` | ✅ |
 | sygnal.com | `google._domainkey` | TXT | *(from Google Admin — set, signing unconfirmed)* | ✅ |
 | sygnal.com | `_dmarc` | TXT | `v=DMARC1; p=none; rua=mailto:dmarc@sygnal.com; fo=1` | ✅ |
-| sonusear.co.nz | `@` | TXT | `v=spf1 include:_spf.google.com ~all` | ☐ |
-| sonusear.co.nz | `google._domainkey` | TXT | *(already present — confirm it is signing)* | — |
-| sonusear.co.nz | `_dmarc` | TXT | `v=DMARC1; p=none; rua=mailto:dmarc@sonusear.co.nz; fo=1` | ☐ |
-| lapelle.co.nz | `@` | TXT | *(already correct — `v=spf1 include:_spf.google.com -all`)* | — |
+| sonusear.co.nz | `@` | TXT | `v=spf1 include:_spf.google.com ~all` | ☐ add |
+| sonusear.co.nz | `google._domainkey` | TXT | *(already present, valid RSA-2048 — signing unconfirmed)* | ✅ |
+| sonusear.co.nz | `_dmarc` | TXT | `v=DMARC1; p=none; rua=mailto:dmarc@sonusear.co.nz; fo=1` | ☐ add |
+| lapelle.co.nz | `@` | TXT | `v=spf1 include:_spf.google.com -all` | ✅ |
 | lapelle.co.nz | `google._domainkey` | TXT | *(from Google Admin — set, signing confirmed)* | ✅ |
 | lapelle.co.nz | `_dmarc` | TXT | `v=DMARC1; p=none; rua=mailto:dmarc@lapelle.co.nz; fo=1` | ✅ |
 
-> [!IMPORTANT]
-> Each `rua` mailbox or alias has to actually exist, or the aggregate reports bounce and `p=none` buys nothing. Confirm before moving any domain to `p=quarantine`.
+### Why the ponsonbydoctors DMARC record gets replaced
+
+The record currently reads `v=DMARC1; p=none; rua=mailto:rua@dmarc.brevo.com` — published by Brevo when the domain was onboarded. It is **valid and working**; Brevo's external-destination authorisation is confirmed present (`ponsonbydoctors.co.nz._report._dmarc.dmarc.brevo.com` returns `v=DMARC1`), so they are entitled to receive the reports and their address should stay.
+
+Two things it lacks, both of which the other four domains have:
+
+- **The aggregate reports go only to Brevo.** They describe every source sending as `@ponsonbydoctors.co.nz` — including Google Workspace, which Brevo has no interest in. Without a copy, there is no way to confirm the domain is clean before tightening to `p=quarantine`.
+- **No `fo=1`**, so no forensic failure reports.
+
+Adding your own address alongside Brevo's needs **no** extra authorisation record, because it is on the same domain as the DMARC record itself. Both destinations receive a copy.
+
+### Mailboxes to create
+
+Every `rua` address has to be deliverable or the reports bounce and `p=none` buys nothing. In Google Workspace the cheapest option is an **alias on an existing mailbox**, or a **Group** if more than one person should see them. One per domain:
+
+| Address | Needed for | Exists? |
+| --- | --- | --- |
+| `dmarc@luxradiology.co.nz` | already published in DMARC | ☐ confirm |
+| `dmarc@ponsonbydoctors.co.nz` | required before the record above goes in | ☐ confirm |
+| `dmarc@sygnal.com` | already published in DMARC | ☐ confirm |
+| `dmarc@lapelle.co.nz` | already published in DMARC | ☐ confirm |
+| `dmarc@sonusear.co.nz` | required before its DMARC record goes in | ☐ confirm |
+
+> [!NOTE]
+> A missing `rua` mailbox does **not** break mail delivery or the Outlook fix — it only costs you the reports. Nothing here is urgent, but it is what makes the eventual move to `p=quarantine` safe rather than a guess.
 
 ## Per-domain notes
 
