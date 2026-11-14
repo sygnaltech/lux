@@ -1,0 +1,93 @@
+---
+/**
+ * /post/<slug> — 3 pages.
+ *
+ * Template extracted from `ponsonbys-new-radiology-service`, chosen because it
+ * renders the most (34,682 bytes against 30,521 for the next). Its title
+ * contains an apostrophe, which is why `bindText` has to try Webflow's
+ * `&#x27;` spelling as well as our own — a detail that would otherwise have
+ * failed on exactly this collection.
+ */
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import {allPosts, imageUrl, sampleOf, type PostDoc} from '../../lib/cms';
+import {TEMPLATE_SAMPLE} from '../../lib/templates';
+import {renderPortableText} from '../../lib/portable';
+import {bindText, bindImage, bindRichTextByContent} from '../../lib/bind';
+
+const templates = import.meta.glob<string>('../../html/main.tpl-post.html', {
+  query: '?raw',
+  import: 'default',
+  eager: true,
+});
+const TEMPLATE = Object.values(templates)[0];
+
+/**
+ * The long-form date, formatted the way Webflow formatted it.
+ *
+ * `en-US`, not `en-NZ`, and that is not an oversight: Webflow's date widget
+ * emitted "April 16, 2023" on this site. `en-NZ` produces "16 April 2023",
+ * which is arguably more correct for an Auckland clinic and is NOT what the
+ * published pages say — binding it would change three live pages' visible
+ * text. Matching the port comes first; re-styling dates is a content decision
+ * for afterwards.
+ */
+const longDate = (iso: string) =>
+  new Date(iso).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    timeZone: 'UTC',
+  });
+
+export async function getStaticPaths() {
+  const posts = await allPosts();
+  const sample = sampleOf(posts, TEMPLATE_SAMPLE.post, 'post');
+  return posts.map((post) => ({params: {slug: post.slug.current}, props: {post, sample}}));
+}
+
+const {post, sample} = Astro.props as {post: PostDoc; sample: PostDoc};
+
+let body = TEMPLATE;
+
+/**
+ * Rich text first — see the note in src/pages/team/[slug].astro. `bindText`
+ * replaces every occurrence of a value, including occurrences inside the
+ * sample's own prose, which would destroy the handle the rich-text binding
+ * uses to find its region.
+ */
+body = bindRichTextByContent(
+  body,
+  'post.body',
+  renderPortableText(sample.body as never, {wrapper: null}),
+  renderPortableText(post.body as never, {wrapper: null}),
+);
+
+body = bindText(body, 'post.title', sample.title, post.title);
+
+/**
+ * The date, as Webflow formatted it.
+ *
+ * Bound on the RENDERED string rather than the ISO value, because the ISO
+ * value appears nowhere in the published HTML. `timeZone: 'UTC'` so a post
+ * dated midnight does not shift a day when the build runs in another zone —
+ * which would silently change a published date.
+ */
+body = bindText(body, 'post.date', longDate(sample.date), longDate(post.date));
+
+body = bindImage(
+  body,
+  'post.mainImage',
+  '/wf/assets/643baaf536d4013823962a96_2022-10-17-10-29-12.webp',
+  imageUrl(post.mainImage, 1400),
+);
+
+const title = `Lux Radiology | ${post.title}`;
+---
+
+<BaseLayout
+  slug="tpl-post"
+  body={body}
+  title={title}
+  description={post.summary?.slice(0, 155)}
+  canonicalPath={`/post/${post.slug.current}`}
+/>

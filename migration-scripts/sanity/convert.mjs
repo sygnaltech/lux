@@ -1,32 +1,22 @@
 /**
- * PER-SITE. Copy to `migration-scripts/sanity/convert.mjs` and rewrite the document
- * loops for this site's collections.
+ * PER-SITE — Lux Radiology.
  *
  * migration/raw/*.json  ->  migration/sanity/content.ndjson
  *
  *   node migration-scripts/sanity/convert.mjs            # convert
- *   node migration-scripts/sanity/convert.mjs --report   # convert and print what happened
+ *   node migration-scripts/sanity/convert.mjs --report   # convert and say what happened
  *
  * Pure function of the raw dump: no network, no writes to Sanity. Run it as
  * often as you like and diff the output. The import is a separate step
  * (`npm run sanity:import`) so a conversion can be inspected before anything
  * touches the dataset.
  *
- * WHY THIS FILE IS NOT PART OF THE ENGINE
- *
- * Because most of the work of a migration is deciding what NOT to carry, and
- * that decision is different on every site. A Webflow CMS that has been live
- * for years typically holds several generations of content in the same
- * collections — a purchased template's demo data, a previous brand's copy, and
- * the current copy — and all of it is "populated". A field-by-field importer
- * would publish all three.
- *
- * So: read the collections before writing this file (§4 of the skill), decide
- * per field, and write the decision down in migration-scripts/webflow/collections.mjs.
- * The shared machinery is in ./convert-lib.mjs and needs no editing.
- *
  * THE ONE ASSERTION THAT MATTERS: no visible character of the client's
  * published wording is lost. Everything else is secondary.
+ *
+ * Every exclusion below is justified with a count in
+ * migration-scripts/webflow/collections.mjs. This file is the loops; that file
+ * is the decisions.
  */
 import {
   load,
@@ -40,21 +30,43 @@ import {
   warn,
   drop,
 } from './convert-lib.mjs';
-import { EXCLUDED, EXPECTED } from '../webflow/collections.mjs';
-import { REDIRECTS } from '../redirects.config.mjs';
+import {EXCLUDED, EXPECTED, FIELD_MAP, TEAM_ORDER, isPublished} from '../webflow/collections.mjs';
+import {REDIRECTS} from '../redirects.config.mjs';
 
 const report = process.argv.includes('--report');
 
 // ---------------------------------------------------------------------------
 // Load
 // ---------------------------------------------------------------------------
-// One entry per collection in COLLECTIONS. A collection excluded WHOLESALE is
-// simply not loaded here — say so in EXCLUDED.collections so the omission is
-// deliberate rather than forgotten.
+// Eleven of the twelve collections. `loc` is NOT loaded: both its items are
+// unpublished drafts, so Webflow renders its list empty and none of its
+// content is on the live site. Declared in EXCLUDED.collections so the
+// omission is on the record rather than looking like an oversight here.
 
-const [parents, children] = await Promise.all([
-  load('<parentCollection>'),
-  load('<childCollection>'),
+const [
+  rawPosts,
+  rawServices,
+  rawTeam,
+  rawCategories,
+  rawReviews,
+  rawNeeds,
+  rawMaternityScans,
+  rawBabyWeeks,
+  rawModals,
+  rawServiceItems,
+  rawPoacs,
+] = await Promise.all([
+  load('post'),
+  load('service'),
+  load('team'),
+  load('category'),
+  load('review'),
+  load('need'),
+  load('maternityScan'),
+  load('babyWeek'),
+  load('modal'),
+  load('serviceItem'),
+  load('poac'),
 ]);
 
 // ---------------------------------------------------------------------------
@@ -62,145 +74,351 @@ const [parents, children] = await Promise.all([
 // ---------------------------------------------------------------------------
 // Applied HERE, not at pull time. The raw dump keeps everything; this is the
 // one place that decides what the site gets, and --report says so out loud.
+//
+// The rule is `isPublished` from collections.mjs, NOT `isArchived || isDraft`.
+// One service — ultrasound-guided-injections — is a draft that Webflow is
+// still serving because it was published before, and it is in the live
+// sitemap. The naive rule drops it and loses a real URL.
 
-const liveChildren = children.filter((i) => {
-  if (EXCLUDED.childRule(i)) {
-    drop(`<childCollection>/${i.fieldData.slug} (<why>)`);
+const keep = (items, rule, label) =>
+  items.filter((item) => {
+    if (!rule(item)) return true;
+    const why = item.isArchived ? 'archived' : 'draft, never published';
+    drop(`${label}/${item.fieldData.slug} (${why})`);
     return false;
-  }
-  return true;
-});
+  });
+
+const posts = keep(rawPosts, EXCLUDED.postRule, 'post');
+const services = keep(rawServices, EXCLUDED.serviceRule, 'service');
+const teamMembers = keep(rawTeam, EXCLUDED.teamRule, 'team');
+const categories = keep(rawCategories, EXCLUDED.categoryRule, 'category');
+const reviews = keep(rawReviews, EXCLUDED.reviewRule, 'review');
+const needs = keep(rawNeeds, EXCLUDED.needRule, 'need');
+const maternityScans = keep(rawMaternityScans, EXCLUDED.maternityScanRule, 'maternityScan');
+const babyWeeks = keep(rawBabyWeeks, EXCLUDED.babyWeekRule, 'babyWeek');
+const modals = keep(rawModals, EXCLUDED.modalRule, 'modal');
+const serviceItems = keep(rawServiceItems, EXCLUDED.serviceItemRule, 'serviceItem');
+const poacs = keep(rawPoacs, EXCLUDED.poacRule, 'poac');
 
 // ---------------------------------------------------------------------------
 // Ordering
 // ---------------------------------------------------------------------------
-// Check whether the child collection HAS an order field. Webflow collections
-// often do not: the order lives only in the parent's reference array, and
-// reading it here is the only way to preserve the order the site renders. An
-// item referenced by no parent gets no order, sorts last, and is reported —
-// which is correct for an orphan and worth knowing about.
+// Four collections carry a usable Seq. TEAM DOES NOT: `seq` is null on every
+// published member and Webflow's manual collection sort is not exposed by the
+// API at all, so the order was captured from the rendered /about page and
+// lives in TEAM_ORDER. After the import, Sanity's `order` field is the only
+// source of truth and that list stops mattering.
 
-const order = new Map();
-for (const parent of parents) {
-  (parent.fieldData['<reference-array-field>'] ?? []).forEach((childId, i) => {
-    if (order.has(childId)) {
-      warn('<parentCollection>', `child ${childId} is listed by more than one parent`);
-      return;
-    }
-    order.set(childId, i + 1);
-  });
-}
-for (const child of liveChildren) {
-  if (!order.has(child.id)) {
-    warn('<childCollection>', `${child.fieldData.slug} is in no parent's list — it will sort last`);
+const teamOrder = new Map(TEAM_ORDER.map((slug, i) => [slug, i + 1]));
+for (const m of teamMembers) {
+  if (!teamOrder.has(m.fieldData.slug)) {
+    warn('team', `${m.fieldData.slug} is not in TEAM_ORDER — it will sort last`);
   }
 }
+for (const slug of teamOrder.keys()) {
+  if (!teamMembers.some((m) => m.fieldData.slug === slug)) {
+    warn('team', `TEAM_ORDER lists "${slug}", which is not a published member`);
+  }
+}
+
+/**
+ * Webflow Option fields come back as opaque ids, not labels.
+ *
+ * `maternityScan.scan-type` and `serviceItem.booking-type` are both Options.
+ * The ids are carried VERBATIM rather than mapped to invented labels: the
+ * grouping the scan calculator relies on is preserved exactly, and nobody has
+ * to trust a guess about which id meant what. Give them readable values when
+ * the calculator is rewired to read Sanity, not before.
+ */
+const option = (v) => (typeof v === 'string' && v ? v : undefined);
+
+/** Provenance, including WHY a draft item is in the dataset at all. */
+const legacy = (item) =>
+  clean({
+    _type: 'legacyRef',
+    webflowId: item.id,
+    webflowSlug: item.fieldData.slug,
+    createdOn: item.createdOn,
+    wasDraft: item.isDraft ? true : undefined,
+  });
 
 // ---------------------------------------------------------------------------
 // Documents
 // ---------------------------------------------------------------------------
-// One loop per collection. `f` is Webflow's fieldData; its keys are the
-// collection's own slugified field names and are frequently NOT what the field
-// is called in the editor — `number-3`, `new-description`, `rich-text`. Read
-// them off the raw dump, never guess.
-//
-// `legacy` parks a field the site does not render but that should not be lost:
-// the Webflow id and slug for traceability, and any unrendered rich text whose
-// content decision has not been made yet. Parking beats deleting; publishing
-// it unread is the mistake.
+// `f` is Webflow's fieldData. Its keys are the collection's slugified field
+// names and are frequently NOT what the field is called in the editor — note
+// `service-descirption`, which is Webflow's own misspelling and the real key.
+// Read off the raw dump, never guessed. FIELD_MAP in collections.mjs is the
+// same mapping as documentation.
 
 const docs = [];
 
-for (const item of parents) {
+// ── post (3) ───────────────────────────────────────────────────────────────
+for (const item of posts) {
   const f = item.fieldData;
   docs.push(
     clean({
-      _id: idFor('<parentType>', item.id),
-      _type: '<parentType>',
+      _id: idFor('post', item.id),
+      _type: 'post',
       title: f.name?.trim(),
-      slug: { _type: 'slug', current: slugFor(REDIRECTS, '/<base-path>', f.slug, { report }) },
-      heroImage: image(f.thumbnail),
-      body: rich(f['<rich-text-field>'], `<parentType>/${f.slug}`),
-      legacy: clean({
-        _type: 'legacyRef',
-        webflowId: item.id,
-        webflowSlug: f.slug,
-        createdOn: item.createdOn,
-      }),
+      slug: {_type: 'slug', current: slugFor(REDIRECTS, '/post', f.slug, {report})},
+      date: f.date,
+      summary: f['post-summary']?.trim(),
+      mainImage: image(f['main-image']),
+      body: rich(f['post-body'], `post/${f.slug}`),
+      // `featured` is NOT carried: false on all three published posts, so it
+      // discriminates nothing and reads it nowhere.
+      legacy: legacy(item),
     }),
   );
 }
 
-for (const item of liveChildren) {
+// ── service (7) ────────────────────────────────────────────────────────────
+for (const item of services) {
   const f = item.fieldData;
-  const title = f.name?.trim();
-  const heading = f['<heading-field>']?.trim();
   docs.push(
     clean({
-      _id: idFor('<childType>', item.id),
-      _type: '<childType>',
-      title,
-      // Only stored when it genuinely differs from the title — otherwise it is
-      // noise an editor has to keep in step for no benefit.
-      heading: heading && heading !== title ? heading : undefined,
-      slug: { _type: 'slug', current: slugFor(REDIRECTS, '/<base-path>', f.slug, { report }) },
-      parent: ref('<parentType>', f['<parent-reference-field>']),
-      heroImage: image(f.thumbnail),
-      body: rich(f['<rich-text-field>'], `<childType>/${f.slug}`),
-      order: order.get(item.id),
-      legacy: clean({
-        _type: 'legacyRef',
-        webflowId: item.id,
-        webflowSlug: f.slug,
-        createdOn: item.createdOn,
-        originalBody: rich(f['<unrendered-rich-text-field>'], `<childType>/${f.slug} (legacy)`),
-      }),
+      _id: idFor('service', item.id),
+      _type: 'service',
+      title: f.name?.trim(),
+      slug: {_type: 'slug', current: slugFor(REDIRECTS, '/services', f.slug, {report})},
+      shortName: f['short-name']?.trim(),
+      order: f.seq ?? undefined,
+      category: ref('category', f.category),
+      needs: (f.needs ?? []).map((id) => ({...ref('need', id), _key: id})),
+      shortDescription: f['short-description']?.trim(),
+      description: rich(f['service-descirption'], `service/${f.slug}`),
+      notice: rich(f.notice, `service/${f.slug} notice`),
+      // `icon-image` and NOT `icon`. Both are populated 7/7; only
+      // `icon-image` filenames appear in the rendered HTML. `icon` is the
+      // superseded 2021 set and one of its values is simply the wrong icon.
+      icon: image(f['icon-image']),
+      pageImage: image(f['service-page-image']),
+      currentlyUnavailable: f['currently-unavailable'] === true ? true : undefined,
+      // NOT carried: photo-credit, sbm-predefined, short-service-description
+      // (all 0/7 populated), icon (unrendered), featured (true on all 7).
+      legacy: legacy(item),
     }),
   );
 }
 
-// A child whose parent was excluded has nowhere to render. Guard it even when
-// none exist today, so dropping a parent later cannot leave a document
-// pointing at one the dataset does not contain.
-const liveParentIds = new Set(parents.map((p) => p.id));
-for (const item of liveChildren) {
-  if (item.fieldData['<parent-reference-field>'] &&
-      !liveParentIds.has(item.fieldData['<parent-reference-field>'])) {
-    drop(`<childType>/${item.fieldData.slug} (its parent was excluded)`);
+// ── team (3) ───────────────────────────────────────────────────────────────
+for (const item of teamMembers) {
+  const f = item.fieldData;
+  docs.push(
+    clean({
+      _id: idFor('team', item.id),
+      _type: 'team',
+      title: f.name?.trim(),
+      slug: {_type: 'slug', current: slugFor(REDIRECTS, '/team', f.slug, {report})},
+      jobTitle: f['job-title']?.trim(),
+      order: teamOrder.get(f.slug),
+      profilePicture: image(f['profile-picture']),
+      profileSquare: image(f['profile-square']),
+      bio: rich(f.bio, `team/${f.slug}`),
+      linkedinUrl: f['linkedin-link'] || undefined,
+      // NOT carried: twitter-link, facebook-link, google-plus-link (all 0/3),
+      // seq (null on all 3 — see TEAM_ORDER).
+      legacy: legacy(item),
+    }),
+  );
+}
+
+// ── category (2) ───────────────────────────────────────────────────────────
+for (const item of categories) {
+  const f = item.fieldData;
+  docs.push(
+    clean({
+      _id: idFor('category', item.id),
+      _type: 'category',
+      title: f.name?.trim(),
+      slug: {_type: 'slug', current: slugFor(REDIRECTS, '/category', f.slug, {report})},
+      shortDescription: f['short-description']?.trim(),
+      brief: rich(f.brief, `category/${f.slug} brief`),
+      notes: rich(f.notes, `category/${f.slug} notes`),
+      bookingNote: rich(f['booking-note'], `category/${f.slug} bookingNote`),
+      bookingButtonText: f['booking-button-text']?.trim(),
+      image: image(f.image),
+      icon: image(f.icon),
+      legacy: legacy(item),
+    }),
+  );
+}
+
+// ── review (169) ───────────────────────────────────────────────────────────
+// Every published review becomes a document, INCLUDING the 17 rated below 4.
+// Their pages are live and in the sitemap; it is the LISTING that filters
+// them out, which is a route concern, not a content one. Dropping them here
+// would delete 17 live URLs.
+for (const item of reviews) {
+  const f = item.fieldData;
+  docs.push(
+    clean({
+      _id: idFor('review', item.id),
+      _type: 'review',
+      title: f.name?.trim(),
+      slug: {_type: 'slug', current: slugFor(REDIRECTS, '/reviews', f.slug, {report})},
+      from: f.from?.trim(),
+      where: f.where?.trim(),
+      rating: f.rating ?? undefined,
+      brief: f.brief?.trim(),
+      text: rich(f.text, `review/${f.slug}`),
+      link: f.link || undefined,
+      date: f.date,
+      // `staff` is NOT carried: a reference to team, 0/169 populated.
+      legacy: legacy(item),
+    }),
+  );
+}
+
+// ── need (3) ───────────────────────────────────────────────────────────────
+for (const item of needs) {
+  const f = item.fieldData;
+  docs.push(
+    clean({
+      _id: idFor('need', item.id),
+      _type: 'need',
+      title: f.name?.trim(),
+      slug: {_type: 'slug', current: f.slug},
+      legacy: legacy(item),
+    }),
+  );
+}
+
+// ── maternityScan (7) ──────────────────────────────────────────────────────
+for (const item of maternityScans) {
+  const f = item.fieldData;
+  docs.push(
+    clean({
+      _id: idFor('maternityScan', item.id),
+      _type: 'maternityScan',
+      title: f.name?.trim(),
+      slug: {_type: 'slug', current: f.slug},
+      scanType: option(f['scan-type']),
+      description: rich(f.description, `maternityScan/${f.slug}`),
+      // Fractional weeks are real: one scan is 12.5-13.5. `?? undefined`
+      // rather than `||` so a legitimate 0 would survive.
+      earliestWeek: f['earliest-week'] ?? undefined,
+      latestWeek: f['latest-week'] ?? undefined,
+      required: f.required === true ? true : undefined,
+      anytime: f.anytime === true ? true : undefined,
+      // NOT carried: sbm-service-id (0/7 populated).
+      legacy: legacy(item),
+    }),
+  );
+}
+
+// ── babyWeek (25) ──────────────────────────────────────────────────────────
+for (const item of babyWeeks) {
+  const f = item.fieldData;
+  docs.push(
+    clean({
+      _id: idFor('babyWeek', item.id),
+      _type: 'babyWeek',
+      title: f.name?.trim(),
+      slug: {_type: 'slug', current: f.slug},
+      weekStart: f['week-start'] ?? undefined,
+      weekEnd: f['week-end'] ?? undefined,
+      description: rich(f.description, `babyWeek/${f.slug}`),
+      bulletPoints: rich(f['bullet-points'], `babyWeek/${f.slug} bullets`),
+      legacy: legacy(item),
+    }),
+  );
+}
+
+// ── modal (13) ─────────────────────────────────────────────────────────────
+for (const item of modals) {
+  const f = item.fieldData;
+  docs.push(
+    clean({
+      _id: idFor('modal', item.id),
+      _type: 'modal',
+      title: f.name?.trim(),
+      slug: {_type: 'slug', current: f.slug},
+      enabled: f.enabled === true ? true : undefined,
+      startDate: f['start-date'],
+      endDate: f['end-date'],
+      image: image(f.image),
+      content: rich(f.content, `modal/${f.slug}`),
+      buttonText: f.button?.trim(),
+      buttonUrl: f.link || undefined,
+      buttonText2: f['button-2']?.trim(),
+      buttonUrl2: f['link-2'] || undefined,
+      // NOT carried: artwork (MultiImage, 0/13 populated).
+      legacy: legacy(item),
+    }),
+  );
+}
+
+// ── serviceItem (53) ───────────────────────────────────────────────────────
+for (const item of serviceItems) {
+  const f = item.fieldData;
+  docs.push(
+    clean({
+      _id: idFor('serviceItem', item.id),
+      _type: 'serviceItem',
+      title: f.name?.trim(),
+      slug: {_type: 'slug', current: f.slug},
+      service: ref('service', f.service),
+      order: f.seq ?? undefined,
+      sbmServiceId: f['sbm-serviceid']?.trim(),
+      bookingType: option(f['booking-type']),
+      weekdayBookingUrl: f['weekday-booking-link'] || undefined,
+      weekendBookingUrl: f['weekend-booking-link'] || undefined,
+      poacWeekendBookingUrl: f['poac-weekend-booking-link'] || undefined,
+      phoneBookingOnly: f['phone-booking-only'] === true ? true : undefined,
+      duration: f.duration?.trim(),
+      price: f.price ?? undefined,
+      // NOT carried: price-note (0/53 populated).
+      legacy: legacy(item),
+    }),
+  );
+}
+
+// ── poac (14) ──────────────────────────────────────────────────────────────
+for (const item of poacs) {
+  const f = item.fieldData;
+  docs.push(
+    clean({
+      _id: idFor('poac', item.id),
+      _type: 'poac',
+      title: f.name?.trim(),
+      slug: {_type: 'slug', current: f.slug},
+      serviceItem: ref('serviceItem', f['service-item']),
+      order: f.seq ?? undefined,
+      legacy: legacy(item),
+    }),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Orphan guard
+// ---------------------------------------------------------------------------
+// A child whose parent was excluded has nowhere to render. `finish` catches a
+// reference to a document that does not exist, but these two are worth
+// naming explicitly: a serviceItem under a dropped service, and a poac under
+// a dropped serviceItem, are both silent blank regions on a live page.
+
+const publishedServiceIds = new Set(services.map((s) => s.id));
+for (const item of serviceItems) {
+  const parent = item.fieldData.service;
+  if (parent && !publishedServiceIds.has(parent)) {
+    warn('serviceItem', `${item.fieldData.slug} references a service that is not published`);
   }
 }
 
-// ---------------------------------------------------------------------------
-// Site settings
-// ---------------------------------------------------------------------------
-// The one document with no Webflow ancestor. The fixed `_id` is what makes it
-// a singleton — see studio/structure.ts.
-//
-// Seed it from the values currently hard-coded in the ported header and footer
-// markup, so the singleton exists and is correct from the first import rather
-// than being an empty form somebody has to find and fill. Read them off the
-// live site's own markup, not off the brief.
-//
-// This is CONTENT, which is why it is here and not in project.jsonc: an editor
-// changes it in the Studio afterwards, and from that point the dataset is the
-// source of truth. Re-running the converter would overwrite it, so once the
-// site is live, delete this block rather than leaving a stale copy that wins
-// on the next import.
+const publishedItemIds = new Set(serviceItems.map((s) => s.id));
+for (const item of poacs) {
+  const parent = item.fieldData['service-item'];
+  if (parent && !publishedItemIds.has(parent)) {
+    warn('poac', `${item.fieldData.slug} references a serviceItem that is not published`);
+  }
+}
 
-docs.push(
-  clean({
-    _id: 'siteSettings',
-    _type: 'siteSettings',
-    orgName: '',
-    orgLegalName: '',
-    titleTemplate: '%s | <org name>',
-    defaultDescription: '',
-    email: '',
-    phone: '',
-    // A reference that can only be resolved now the documents exist.
-    defaultContact: ref('<type>', '<webflow-item-id>'),
-  }),
-);
+// Field map is imported purely so an edit here that forgets to update the
+// documentation in collections.mjs is at least visible in one file's imports.
+void FIELD_MAP;
+void isPublished;
 
 // ---------------------------------------------------------------------------
 // Checks, then write
@@ -209,7 +427,7 @@ docs.push(
 await finish(docs, {
   expected: EXPECTED,
   report,
-  // Types listed in EXPECTED that this converter deliberately does not emit,
-  // e.g. a collection excluded wholesale.
+  // `location` is in EXPECTED as 0 rather than listed here, so the assertion
+  // "this converter emits no location documents" is actually checked.
   ignoreTypes: [],
 });

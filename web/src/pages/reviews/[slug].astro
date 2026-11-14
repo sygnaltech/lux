@@ -1,0 +1,147 @@
+---
+/**
+ * /reviews/<slug> — 169 pages, the largest collection on the site.
+ *
+ * Renders each review into the frozen Webflow template extracted from
+ * `waimaria-hauraki-ngapo`. Webflow leaves no marker on a CMS-bound element,
+ * so every bind point is found by searching for the SAMPLE item's own value —
+ * see src/lib/bind.ts, and note that every helper throws rather than falling
+ * back. A fallback here would publish one reviewer's words under 168 other
+ * people's names.
+ */
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import {allReviews, sampleOf, type ReviewDoc} from '../../lib/cms';
+import {TEMPLATE_SAMPLE} from '../../lib/templates';
+import {renderPortableText} from '../../lib/portable';
+import {bindText, bindRichTextByContent} from '../../lib/bind';
+
+const templates = import.meta.glob<string>('../../html/main.tpl-reviews.html', {
+  query: '?raw',
+  import: 'default',
+  eager: true,
+});
+const TEMPLATE = Object.values(templates)[0];
+
+/**
+ * The sample document travels in props, deliberately.
+ *
+ * `getStaticPaths` runs once; this component's frontmatter runs once PER PAGE.
+ * Fetching the collection again here to find the sample cost 169 extra Sanity
+ * round-trips and turned a 2-second build into 71 seconds — and it scales with
+ * the collection, so it would only get worse.
+ */
+export async function getStaticPaths() {
+  const reviews = await allReviews();
+  const sample = sampleOf(reviews, TEMPLATE_SAMPLE.review, 'review');
+  return reviews.map((review) => ({
+    params: {slug: review.slug.current},
+    props: {review, sample},
+  }));
+}
+
+const {review, sample} = Astro.props as {review: ReviewDoc; sample: ReviewDoc};
+
+let body = TEMPLATE;
+
+/**
+ * The review body, replacing the region that holds the sample's own text.
+ *
+ * BOUND BEFORE THE NAME, and the order matters: `bindText` replaces every
+ * occurrence of a value, including occurrences inside the sample's prose, and
+ * a reviewer who names a staff member would otherwise have the handle rewritten
+ * underneath this binding. /team/andrew failed exactly that way.
+ *
+ * `wrapper: null` because the template already provides the `.w-richtext`
+ * div — rendering another inside it would nest two and double the inherited
+ * padding on every review page.
+ */
+body = bindRichTextByContent(
+  body,
+  'review.text',
+  renderPortableText(sample.text as never, {wrapper: null}),
+  renderPortableText(review.text as never, {wrapper: null}),
+);
+
+/**
+ * The reviewer's name, in the <h2> under "Client Review".
+ *
+ * `title` and `from` hold the same string on all 169 documents (verified), and
+ * the template renders it twice — once in the heading and once inside the
+ * JSON-LD below. Binding by value therefore catches both, and the JSON-LD copy
+ * is replaced wholesale a few lines further down anyway.
+ */
+body = bindText(body, 'review.title', sample.title, review.title);
+
+/**
+ * The star rating.
+ *
+ * Not markup: the stars are drawn at runtime by Sygnal Attributes from
+ * `wfu-rating` on `div[wfu="rating"]`. Binding the attribute is the whole job,
+ * and missing it would show every review as the sample's five stars — including
+ * the thirteen one-star reviews, which would be a misrepresentation rather
+ * than a cosmetic bug.
+ */
+const ratingAttr = `wfu-rating="${sample.rating}"`;
+if (!body.includes(ratingAttr)) {
+  throw new Error(
+    `review.rating: template has no ${ratingAttr}. The star widget's attribute moved or the sample changed.`,
+  );
+}
+body = body.split(ratingAttr).join(`wfu-rating="${review.rating}"`);
+
+/**
+ * JSON-LD, REGENERATED rather than string-substituted.
+ *
+ * Two reasons. First, it carries four separate per-document values (author,
+ * datePublished, reviewBody, ratingValue) and patching each by hand invites
+ * one to be forgotten — which ships 169 pages all attributed to one person.
+ *
+ * Second, THE LIVE SITE'S VERSION IS INVALID JSON: Webflow interpolates the
+ * review body raw, and this sample's body contains a newline, so the string
+ * literal is unterminated. Regenerating through JSON.stringify fixes that for
+ * every page at no cost.
+ */
+const jsonLd = {
+  '@context': 'https://schema.org/',
+  '@type': 'Review',
+  author: {'@type': 'Person', name: review.title},
+  datePublished: review.date,
+  reviewBody: review.brief,
+  itemReviewed: {'@type': 'Organization', name: 'Lux Radiology'},
+  reviewRating: {
+    '@type': 'Rating',
+    ratingValue: review.rating,
+    worstRating: 1,
+    bestRating: 5,
+    reviewAspect: 'Service',
+  },
+};
+
+const ldBlock = /<script type="application\/ld\+json">[\s\S]*?<\/script>/;
+if (!ldBlock.test(body)) {
+  throw new Error('review JSON-LD: no ld+json script block in the template.');
+}
+body = body.replace(
+  ldBlock,
+  `<script type="application/ld+json">${JSON.stringify(jsonLd, null, 2).replace(
+    /</g,
+    '\\u003c',
+  )}</script>`,
+);
+
+/** The date comment Webflow emits above the JSON-LD, so it does not contradict it. */
+body = body.replace(
+  /<!--\s*[A-Z][a-z]{2} \d{2}, \d{4}\s*-->/,
+  `<!-- ${new Date(review.date).toISOString().slice(0, 10)} -->`,
+);
+
+const title = `Lux Radiology | Client Review | ${review.title}`;
+---
+
+<BaseLayout
+  slug="tpl-reviews"
+  body={body}
+  title={title}
+  description={review.brief.slice(0, 155)}
+  canonicalPath={`/reviews/${review.slug.current}`}
+/>

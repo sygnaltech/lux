@@ -1,31 +1,54 @@
 import type {SchemaTypeDefinition} from 'sanity';
 
+import {legacyRef, portableText} from './objects';
+import {post, service, team, category, review} from './documents';
+import {need, maternityScan, babyWeek, modal, serviceItem, poac} from './supporting';
+
 /**
- * The content model. DELIBERATELY EMPTY until §4.
+ * The content model, authored in §4 from the LIVE Webflow CMS — not from the
+ * rendered pages, and not carried over from another site.
  *
- * It is authored AFTER reading the Webflow CMS directly — not from the
- * rendered pages, and never carried over from another site. The skill is
- * blunt about why: on the first migration, reading the collections found a
- * purchased template's demo data still live in every collection, two
- * rich-text fields where only the second renders (the first still carrying a
- * pre-rebrand company name), boilerplate describing an entirely different
- * subject, a collection whose order existed only in its parent's reference
- * array, a switch wired to nothing, and three dates for one item of which two
- * were Webflow system timestamps. A field-by-field importer would have
- * published all of it.
+ * Eleven document types from twelve Webflow collections. The twelfth (`loc`)
+ * publishes nothing and is excluded wholesale; see
+ * migration-scripts/webflow/collections.mjs for that decision and for every
+ * populated-but-unpublished field, with counts.
  *
- * For Lux specifically, §1 already shows where that work will land: 169
- * `/reviews/*` items, including several obvious duplicates and at least one
- * junk submission. Deciding what does NOT come across is the substance of §4,
- * and it gets written down in migration-scripts/webflow/collections.mjs and
- * migration-scripts/sanity/convert.mjs — with a `--report` that says what was
- * dropped — not improvised here.
+ *   PUBLIC ITEM PAGES — slugs are live URLs, do not change them
+ *     review          169    /reviews/<slug>
+ *     service           7    /services/<slug>
+ *     post              3    /post/<slug>
+ *     team              3    /team/<slug>
+ *     category          2    /category/<slug>
+ *                     ---
+ *                     184    + 18 static pages = 202, the live sitemap count
  *
- * Known collections to model, from the live URL inventory:
- *   /services/*    7 items
- *   /reviews/*   169 items   <- audit hard before carrying
- *   /team/*        3 items
- *   /post/*        3 items
- *   /category/*    2 items
+ *   DATA ONLY — no URL, bound into lists on static pages
+ *     serviceItem      53
+ *     babyWeek         25
+ *     poac             14
+ *     modal            13
+ *     maternityScan     7
+ *     need              3
+ *
+ *   Total: 299 documents.
  */
-export const schemaTypes: SchemaTypeDefinition[] = [];
+export const schemaTypes: SchemaTypeDefinition[] = [
+  // Objects first — documents reference them by name.
+  legacyRef,
+  portableText,
+
+  // Public item pages.
+  review,
+  service,
+  post,
+  team,
+  category,
+
+  // Data only.
+  serviceItem,
+  babyWeek,
+  poac,
+  modal,
+  maternityScan,
+  need,
+];

@@ -1,0 +1,96 @@
+---
+/**
+ * The 404 page.
+ *
+ * A DELIBERATE IMPROVEMENT ON THE LIVE SITE, and the only page here that is
+ * not a faithful port — so it is worth saying why.
+ *
+ * Webflow serves two different things today, neither of them useful:
+ *   - `/404` returns HTTP **200** and renders the HOME page. That is the trap
+ *     §7 warns about: a status check on that path reports success.
+ *   - A genuinely missing path returns 404 with a 14KB body containing the
+ *     head furniture and NOTHING else — no nav, no footer, no message.
+ *
+ * Meanwhile `wrangler.prod.jsonc` sets `not_found_handling: "404-page"`, which
+ * requires a `404.html` in the asset directory. Without one Cloudflare answers
+ * with its own bare page, so the config would be quietly meaningless.
+ *
+ * This page therefore carries the real nav and footer so a visitor who hits a
+ * dead link can navigate, which Webflow's version does not allow.
+ *
+ * NOT IN THE SITEMAP — `npm run sitemap` asserts that explicitly.
+ *
+ * It does NOT use BaseLayout: BaseLayout resolves its furniture through the
+ * extractor's manifest, and `/404` has no manifest entry because it is not a
+ * ported page. The shared fragments are used directly instead.
+ */
+const fragments = import.meta.glob<string>('../html/*.html', {
+  query: '?raw',
+  import: 'default',
+  eager: true,
+});
+
+const frag = (name: string): string => fragments[`../html/${name}`] ?? '';
+
+const nav = frag('nav.html');
+const footer = frag('footer.html');
+
+/** Same Webflow-CDN preconnect removal as BaseLayout — see the note there. */
+const headCustom = frag('head-custom.html').replace(
+  /\s*<link[^>]*href="https:\/\/cdn\.prod\.website-files\.com"[^>]*>/g,
+  '',
+);
+
+if (!nav || !footer) {
+  throw new Error(
+    '404.astro: nav.html or footer.html is missing. Run `npm run extract` before building.',
+  );
+}
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Page not found | Lux Radiology</title>
+    {/* A 404 must never be indexed, whatever it is linked from. */}
+    <meta name="robots" content="noindex, follow" />
+
+    {/*
+      Self-referential canonical.
+
+      Inert in practice — a canonical on a `noindex` page is ignored — but
+      `npm run sitemap` asserts that EVERY built page carries one, including
+      /404, and it is right to. The failure that check exists for is a page
+      canonicalising to a DIFFERENT page, and a 404 inheriting a template's
+      canonical would be exactly that. Pointing it at itself satisfies the
+      gate without making a claim.
+    */}
+    <link href="https://www.luxradiology.co.nz/404" rel="canonical" />
+
+    <Fragment set:html={headCustom} />
+  </head>
+
+  <body>
+    <Fragment set:html={nav} />
+
+    <div class="section gray full">
+      <div class="w-container">
+        <div class="top-margin">
+          <h1>Page not found</h1>
+          <p>
+            The page you were looking for is not here. It may have moved, or the
+            link that brought you here may be out of date.
+          </p>
+          <p>
+            Use the menu above to find what you need, or
+            <a href="/contact">get in touch</a> and we will point you in the right
+            direction.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <Fragment set:html={footer} />
+  </body>
+</html>

@@ -1,0 +1,13 @@
+# Matches the live Webflow robots.txt, with one correction.
+#
+# The live file declares the same Sitemap line TWICE — harmless but pointless,
+# so it appears once here.
+#
+# `Disallow: /cdn-cgi/` is kept: it is Cloudflare's own endpoint path, the zone
+# is on Cloudflare before and after the cut-over, and the rule is still
+# correct.
+
+User-agent: *
+Disallow: /cdn-cgi/
+
+Sitemap: https://www.luxradiology.co.nz/sitemap.xml

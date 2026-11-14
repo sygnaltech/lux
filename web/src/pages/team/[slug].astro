@@ -1,0 +1,85 @@
+---
+/**
+ * /team/<slug> — 3 pages.
+ *
+ * Template extracted from `alan`. One image and one rich-text region, so the
+ * bindings are simple — but this is the collection the skill's §6 warning is
+ * about: on the first migration all six team pages rendered the SAME
+ * photograph because only the text was bound, and the text being correct made
+ * it invisible. `bindImage` throws rather than falling back, and the image is
+ * diffed per page after the build.
+ */
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import {allTeam, imageUrl, sampleOf, type TeamDoc} from '../../lib/cms';
+import {TEMPLATE_SAMPLE} from '../../lib/templates';
+import {renderPortableText} from '../../lib/portable';
+import {bindText, bindImage, bindRichTextByContent} from '../../lib/bind';
+
+const templates = import.meta.glob<string>('../../html/main.tpl-team.html', {
+  query: '?raw',
+  import: 'default',
+  eager: true,
+});
+const TEMPLATE = Object.values(templates)[0];
+
+export async function getStaticPaths() {
+  const members = await allTeam();
+  const sample = sampleOf(members, TEMPLATE_SAMPLE.team, 'team');
+  return members.map((member) => ({
+    params: {slug: member.slug.current},
+    props: {member, sample},
+  }));
+}
+
+const {member, sample} = Astro.props as {member: TeamDoc; sample: TeamDoc};
+
+let body = TEMPLATE;
+
+/**
+ * RICH TEXT BEFORE SHORT TEXT, AND THE ORDER IS LOAD-BEARING.
+ *
+ * `bindText` replaces every occurrence of the sample's value. The sample here
+ * is Alan, and his bio opens "Alan is an experienced X-ray technician…" — so
+ * binding the name first rewrote the name INSIDE the bio, after which the
+ * rich-text region no longer started with the text used to find it and the
+ * build failed on /team/andrew.
+ *
+ * Replacing the region wholesale first removes the sample's prose entirely, so
+ * the later name binding can only touch the headings and alt text where it
+ * belongs.
+ */
+body = bindRichTextByContent(
+  body,
+  'team.bio',
+  renderPortableText(sample.bio as never, {wrapper: null}),
+  renderPortableText(member.bio as never, {wrapper: null}),
+);
+
+body = bindText(body, 'team.title', sample.title, member.title);
+body = bindText(body, 'team.jobTitle', sample.jobTitle, member.jobTitle, {allowMissing: true});
+
+/**
+ * The portrait.
+ *
+ * The template's single `<img class="team-photo">` is the sample's
+ * `profilePicture`. `profileSquare` is populated on all three members but
+ * appears nowhere in this template — it is used by the listing cards, not the
+ * detail page — so it is not bound here.
+ */
+body = bindImage(
+  body,
+  'team.profilePicture',
+  '/wf/assets/6752a23ede323c3f64b41e08_alan-2.avif',
+  imageUrl(member.profilePicture, 900),
+);
+
+const title = `Lux Radiology | Team | ${member.title}`;
+---
+
+<BaseLayout
+  slug="tpl-team"
+  body={body}
+  title={title}
+  description={member.jobTitle ? `${member.title} — ${member.jobTitle} at Lux Radiology.` : undefined}
+  canonicalPath={`/team/${member.slug.current}`}
+/>

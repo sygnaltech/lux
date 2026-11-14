@@ -1,0 +1,468 @@
+---
+id: 0f7gxYyirdtDWPSqEWKvhV
+title: "Migration Skill Fixes"
+format-version: 2
+date: 2026-11-14
+---
+
+# Migration Skill Fixes
+
+Findings from running `webflow-sanity:migration` §1–§7 end to end against Lux Radiology,
+written down so they can be fed back into the skill rather than rediscovered on the next
+site.
+
+Three kinds of finding:
+
+- **Engine bugs** — defects in `migration-scripts/`, now patched in this repo. The skill
+  says the engine is copied *as-is* and never edited per site, so each one is a debt to
+  push upstream and then re-sync.
+- **Scaffold gaps** — no engine change needed, but §2 does not mention them and each cost
+  time or shipped a hazard.
+- **Process gaps** — the method itself was wrong or silent about something, independent of
+  any code.
+
+> [!IMPORTANT]
+> Every item below is a **general** Webflow/Astro/Sanity problem, not a Lux quirk. That is
+> the argument for upstreaming rather than leaving local patches.
+
+## The one that matters most
+
+### P1. `isArchived || isDraft` is the WRONG published test
+
+**Process gap. Highest priority on this list.** It silently deletes live URLs.
+
+The skill states plainly that "`isArchived` and `isDraft` are Webflow's own flags and are
+the honest test for 'not live'". On this site that rule is wrong, and wrong in the
+direction that loses content:
+
+`service/ultrasound-guided-injections` has `isDraft: true` **and**
+`lastPublished: "2026-05-29"`. Webflow carries on serving an item that was published and
+later flipped back to draft — the page is live, it renders, and it is in the live
+sitemap. The naive rule drops it, taking a real URL out of a migration whose entire
+acceptance test is URL parity.
+
+`lastPublished` is the discriminator. The site's three *other* drafts
+(`immigration-x-rays`, `3d4d`, `ultrasound`) all have `lastPublished: null` — never
+published, correctly dropped.
+
+```js
+export const isPublished = (item) =>
+  !item.isArchived && (!item.isDraft || item.lastPublished != null);
+```
+
+Verified: this reproduces the live sitemap **exactly** for all five public collections
+(post 3, service 7, team 3, category 2, review 169). The naive rule gets `service` wrong
+by one — and nothing downstream would have noticed, because 6 documents producing 6 pages
+is internally consistent.
+
+The skill's §4 should carry this as the default rule, with the naive form named as the
+trap.
+
+## Engine bugs
+
+### E1. A shell region with no class of its own
+
+**High.** Silent failure mode.
+
+`SHELL` addressed nav and footer as `{tag, cls}`, and `findSpan` requires the element to
+carry the class itself. Lux's entire navigation region is an **unclassed** wrapper:
+
+```html
+<body><div><div class="mobile-navigation … w-nav"> …
+```
+
+That bare `<div>` holds five siblings — mobile navbar, desktop navbar, sticky scroll
+navbar, mobile nav section, parking alert bar. No class covers the set, so ~10KB of nav
+duplicates into every page's main fragment and the page still renders perfectly.
+
+**Fixed here** with a second addressing mode, `{tag, childCls}` — the innermost `tag`
+wrapping an element with class `childCls`.
+
+| File | Change |
+|---|---|
+| `lib/html.mjs` | new `findSpanWrapping(spans, tag, childCls)` |
+| `extract-webflow-page.mjs` | `findShell()` / `describeShell()`; SHELL lookups route through them |
+
+Two properties the upstream version must keep:
+
+**STRICT ancestry.** Written first with `s.start <= marker.start`, which matches the
+marker *itself* (a `div` inside a `div`) and, being innermost, wins. `nav.html` came out
+at **2,897 bytes instead of 10,278** — the mobile navbar alone, with the rest left
+duplicated in all 18 fragments. It rendered perfectly; the only signal was a shared file
+too small to be a nav. Same class of bug as the `\bfooter\b` story already in
+`html.mjs`'s header, reached by a different route — worth adding as a second worked
+example there.
+
+**INNERMOST, not outermost** — the opposite of `findSpan`. Every ancestor up to `<body>`
+contains the marker, so the outermost match is whatever top-level wrapper a page happens
+to have. `/book` wraps its whole page in `div.page_wrapper`, so outermost would have
+returned the entire page on that one route and the nav region on the other seventeen.
+
+### E2. The non-ASCII literals in `test-converter.mjs` had been flattened
+
+**High.** A check that could never pass, and one that could never fail.
+
+Two patterns in the nbsp assertion were written as literal characters and had been
+silently turned into ordinary spaces somewhere in the file's history:
+
+```js
+if (/&nbsp;| /.test(sourceAll)) {              // ← second alternative is a plain space
+  check('no literal nbsp survives',
+        !portableTextToPlain(all).includes(' '),  // ← a plain space
+```
+
+So the guard matched any fixture containing **any space** (always), and the assertion
+demanded the text contain **no space at all** (never). The check failed on every corpus
+for every site, reporting "Webflow spacing was not normalised" while the converter was
+handling `&nbsp;` correctly all along.
+
+**Fixed** by using `' '` / `'‌'` escapes. A non-ASCII character that carries
+meaning must never be written as a literal byte in engine source.
+
+### E3. Fixture guards match across file boundaries
+
+**Medium.** Demands a construct the corpus does not contain.
+
+`test-converter.mjs` and `test-portable.mjs` both build `sourceAll` by joining every
+fixture, then guard with patterns containing `[\s\S]*?`:
+
+```js
+if (/<li[^>]*>[\s\S]*?<(ul|ol)\b/i.test(sourceAll)) { … }
+```
+
+An `<li>` in one fixture happily matches a `<ul>` in a *different* fixture, so the suite
+asserted nested-list behaviour on a corpus with zero nested lists. **Fixed** with a
+per-fixture `anySource(re)` helper in both files. Single-tag guards can keep using
+`sourceAll`.
+
+### E4. `jsdom` is an undeclared engine dependency
+
+**Medium.** `sanity/html-to-portable-text.mjs` imports it; nothing installs it. `npm test`
+dies with `ERR_MODULE_NOT_FOUND` instead of its intended, informative refusal about
+missing fixtures. `jsonc-parser` has the same requirement and *is* documented — `jsdom`
+just needs the same line.
+
+### E5. The asset localiser's URL patterns, both of them
+
+**High.** Ten assets reported as Webflow 403s that were all local bugs. All ten fetch 200
+once the URL is correct.
+
+**HTML pattern over-captured.** Webflow writes CSS into HTML `style` attributes, where the
+`url(...)` quotes are HTML-escaped:
+
+```html
+style="background-image:url(&quot;https://…/icon.svg&quot;)"
+```
+
+`[^"'\s]+` sees no `"` there — `&`, `q`, `u`, `o`, `t`, `;` and `)` are all allowed — so
+it swallowed `&quot;)` onto the end of six URLs.
+
+**CSS pattern truncated.** `[^"')\s]+` stops at the first `)`, including one inside a
+filename. `clock%20(1).png` became `…clock%20(1` for four assets. The skill's own comment
+warns about parentheses in Webflow filenames and says "the HTML pattern must NOT exclude
+`)`" — but the CSS pattern has the same exposure and it is the one that bit.
+
+**Fixed** with a shared `TERM` alternation that includes `&quot;`/`&#34;`/`&apos;`/`&#39;`,
+and a CSS pattern that consumes `)` when more filename follows and terminates only on a
+`)` followed by end-of-value punctuation.
+
+### E6. Webflow's asset CDN is not in the Webflow-host list
+
+**High.** A site can pass the audit while still loading images from Webflow.
+
+`d3e54v103j8qbb.cloudfront.net` is Webflow's static asset CDN. It was absent from both
+`WEBFLOW_HOSTS` in `check-assets.mjs` and `WF_HOST` in the localiser, and it is easy to
+miss precisely because the hostname says "cloudfront" and nothing in it says "webflow". On
+this site it served a background SVG from inside the ported stylesheet.
+
+**Fixed** in both, matched by literal bucket id — a blanket `*.cloudfront.net` would also
+sweep up a client's own distribution.
+
+### E7. `check-assets.mjs` reported assets missing that were present
+
+**Medium.** Two independent causes, same symptom.
+
+- The `url()` branch of `LOCAL_REF` excluded `)`, truncating `…clock-(1).png` to
+  `…clock-(1` — then failing the exists-on-disk check against a file sitting right there,
+  correctly referenced. Four assets.
+- `decodeURIComponent` ran before the disk probe. Webflow is inconsistent about encoding
+  its own filenames, and `localName` decodes exactly once: a singly-encoded name lands on
+  disk as `clock-(1).png`, a **doubly** encoded one as the literal
+  `wilson%20car%20park%20(Medium).jpeg`, percent signs and all. Decoding again invented a
+  phantom missing file.
+
+**Fixed:** four alternatives in `LOCAL_REF` (attribute, `url("…")`, `url('…')`, bare
+`url(…)`), and the disk probe now accepts the raw **or** decoded form.
+
+### E8. `check-assets.mjs` does not scan JavaScript
+
+**Low, but worth stating.** `files` covers `.html` and `.css` only, so Webflow URLs inside
+ported JS are invisible to the "no Webflow-hosted assets" gate. On this site two
+"Made in Webflow" badge SVGs remain inside a minified runtime chunk.
+
+Left as a documented residual rather than fixed: the badge is absent from the live DOM and
+from ours (Webflow ships the logic to every site and only renders it on free plans), so the
+code path is unreachable, and rewriting a minified vendor chunk is a worse risk than the
+residual. But the engine should at least **report** JS hits so the decision is conscious.
+
+### E9. `check-sitemap.mjs` canonical check was attribute-order dependent
+
+**High.** It produced a false failure *and* a vacuous pass simultaneously.
+
+```js
+const canonicalOf = (html) => html.match(/<link rel="canonical" href="([^"]*)"/)?.[1];
+```
+
+Webflow writes the attributes the other way round — `<link href="…" rel="canonical"/>` —
+so this matched nothing on a correctly ported site. "every page has a canonical" failed on
+all 202 pages, and "every page is its own canonical" **passed vacuously** because it had
+no hrefs to compare and therefore could never fail.
+
+A check that cannot fail is worse than no check, because it reads as reassurance. **Fixed**
+by finding the tag first, then the `href` within it, both case-insensitively.
+
+### E10. No command for the §6 image check
+
+**Medium.** The checklist has the row and ships nothing to satisfy it.
+
+The skill asks for "list the rendered pages and diff one image per page" by hand — which
+is exactly why it gets skipped, and the bug it catches (text bound per item, images not)
+is the one it calls most likely to ship.
+
+**Added here** as `migration-scripts/check-cms-images.mjs` (`npm run cms:images`), now part
+of `preflight`. Per collection it asserts the page count, that every page references at
+least one Sanity image, and that no two pages share an identical image set — with declared
+exceptions carrying a reason, because genuine duplicates exist (two Lux posts really do
+share one main image).
+
+It earned its place immediately by flagging that pair, which then had to be verified
+against the raw dump rather than waved through.
+
+## Scaffold gaps
+
+### S1. Astro 7 + the Cloudflare adapter split the build output
+
+**High.** Breaks three engine scripts and the Wrangler config.
+
+The skill says "Astro 5 `output: 'static'` with the Cloudflare adapter". On Astro 7 the
+adapter defaults `build.client` to `./client/`, so pages land in
+`web/dist/client/about.html` — while `verify-port.mjs`, `check-assets.mjs` and
+`check-sitemap.mjs` all compute `join(WEB, 'dist')` and expect `<page>.html` directly
+inside it. Pointing Wrangler at `./web/dist` instead serves an empty directory and 404s
+every route **with nothing in the logs**.
+
+**Fixed** with one line rather than forking three engine files:
+
+```js
+build: {format: 'file', client: './', server: './_server/'}
+```
+
+`_server` then needs an `.assetsignore` entry.
+
+### S2. The adapter prerenders in workerd, which has no filesystem
+
+**High.** This is the one that will ambush the next site in §3, not §2.
+
+`prerenderEnvironment` defaults to `'workerd'`. Prerender then runs in a sandbox whose cwd
+is `/bundle` with **no repository filesystem at all**. The first build failed with
+`Could not locate project.jsonc … (/bundle)`, which reads like a path bug and is a sandbox
+boundary.
+
+> [!CAUTION]
+> Far bigger than the `project.jsonc` read. The engine assumes Node semantics throughout —
+> `extract` writes to `web/src/html/` and `web/src/data/`, and the verifiers read `dist`
+> from disk. Anything touching `node:fs` during prerender fails identically.
+
+**Fixed, belt and braces:** `prerenderEnvironment: 'node'`, config values inlined via Vite
+`define` from `astro.config.mjs` (the last point where Node's `fs` exists), and page
+fragments loaded with `import.meta.glob(…, {query: '?raw', eager: true})` so Vite bundles
+them.
+
+### S3. The adapter writes `wrangler.json` into the assets directory
+
+**Medium.** Publishes configuration if unignored — it is fetchable at `/wrangler.json`,
+listing bindings and account-shaped config. §8 covers `.assetsignore` for `_worker.js` and
+`_routes.json` only. Current adapter versions *do* append `wrangler.json` and `.dev.vars`
+themselves, so the built file legitimately lists it twice if you also add it — worth saying,
+both so the duplicate is not read as a mistake and so nobody relies on someone else's
+default to prevent a config leak.
+
+### S4. `.gitignore`'s bare `.env` does not cover what the guard reads
+
+**High.** Secrets-shaped files were committable.
+
+Git matches a bare `.env` as an exact filename, but
+`guard-production-deploy.mjs` explicitly scans `.env`, `.env.local`, `.env.production` and
+`.env.production.local`. Three of the four were not ignored. Anything the guard reads is a
+file that can exist, and therefore one that can be committed.
+
+```
+.env
+.env.*
+.dev.vars
+.dev.vars.*
+!.env.example
+!.dev.vars.example
+```
+
+No leading slashes, so these match at any depth and `studio/.env` is covered by the same
+rules. The negations are required or the committed templates vanish too.
+
+### S5. `migration/raw/` is documented as gitignored and is not
+
+**High.** Personal data into git history, permanently.
+
+`pull.mjs`'s own docstring says "migration/raw/ is gitignored: it is large, re-pullable".
+Nothing in the scaffold adds the rule. On this site that would have committed 216 review
+items — named individuals' review text and their Google avatar URLs — into history, where
+deleting it later does not help.
+
+The skill should add `migration/raw/` to the ignore guidance, and should say out loud that
+the converted NDJSON *is* intended to be committed so that choice is made knowingly.
+
+### S6. `astro check` typechecks the ported Webflow bundles
+
+**Medium.** `allowJs` has to be on (the config reader is `.mjs`) and Astro's strict
+tsconfig uses `include: ["**/*"]`, so `web/public/wf/js/*.js` — Webflow's minified jQuery
+and webpack chunks — get type-checked. ~215KB of diagnostics about code we did not write,
+and slow enough to look hung. One line: `"exclude": ["dist", "public/wf"]`.
+
+### S7. `.wrangler/` is not mentioned
+
+**Low.** `astro build` (via the adapter) and any `wrangler` invocation, including
+`--dry-run`, create `web/.wrangler/` holding miniflare's emulated KV/R2/D1/cache sqlite
+files. ~20 untracked files. Belongs beside `.astro/` and `.sanity/`.
+
+### S8. `sanity deploy` has no dry run for a Studio
+
+**Low.** Documentation accuracy. The acceptance list says to run
+`npm run studio:deploy -- --dry-run` "if supported". On the current CLI `--dry-run` exists
+**only** for App SDK app deployments (`sanity deploy --create --title … --dry-run`), never
+for a Studio. So the fallback is always the path taken — verify config, build and help, and
+state that hosting permissions and hostname availability remain unverified. Worth stating
+definitively so nobody hunts for a flag that is not there, or substitutes a real deploy.
+
+### S9. Two Sanity API deprecations in the scaffold shape
+
+**Low.** Both warn on every build; both are one line.
+
+| Deprecated | Current | Where |
+|---|---|---|
+| `autoUpdates: false` | `deployment: {autoUpdates: false}` | `studio/sanity.cli.ts` |
+| default export of `@sanity/image-url` | named `createImageUrlBuilder` | the site's Sanity client |
+
+### S10. The adapter provisions an unused `IMAGES` binding
+
+**Low.** A ported Webflow site never asks Astro to process an image — the pages carry
+Webflow's own `<img>` markup verbatim and CMS images come from Sanity's CDN with its own
+transforms. The binding then has to exist for a deploy to validate, for nothing.
+`imageService: 'passthrough'` removes it. (A `SESSION` KV binding is still added with no
+apparent opt-out; inert with no Worker, so left alone.)
+
+## Process gaps
+
+### P2. Rich text must be bound BEFORE short text values
+
+**High.** Cost a build failure that looked like a template problem.
+
+`bindText` replaces every occurrence of the sample's value — correctly, since Webflow
+renders the same field in several places. But the team template's sample is Alan, and his
+bio opens *"Alan is an experienced X-ray technician…"*. Binding the name first rewrote the
+name **inside the bio**, after which the rich-text region no longer began with the text
+used to locate it, and `/team/andrew` failed.
+
+Replace rich-text regions wholesale first; bind short values afterwards. §6 should say so
+— it is not obvious, and the failure names the wrong culprit.
+
+### P3. Locate rich-text regions by CONTENT, not by index
+
+**Medium.** A positional index is a coin-flip that renders convincingly either way.
+
+The service template has **six** `.w-richtext` regions: the service description, the
+category's booking note, and four pieces of static furniture repeated across several
+templates. Which index is which is not obvious, not stable across a re-extraction, and
+wrong in a way that still looks like prose.
+
+Matching on the sample's own rendered text makes the binding say what it means, and turns a
+template change into a build failure instead of a content swap. Worth promoting from
+technique to instruction in §6.
+
+### P4. The same CMS field renders as `<img>` on one template and CSS background on another
+
+**Medium.** `category.image` is a `background-image:url(&quot;…&quot;)` on
+`div.hero-image`; `category.icon`, immediately beside it, is an `<img>`. Same content
+model, two mechanisms, and only the template says which. The first attempt used an
+`<img>` binder for both and failed the build on `/category/x-ray` — the correct outcome,
+but §6 should warn that a background-image binder is also needed, and that the escaped
+quotes bite there too.
+
+### P5. A field can appear in the template by coincidence
+
+**Medium.** `service.shortName` ("Pregnancy Scans") occurred exactly once in its
+template — inside the description's own price list, as a line of the client's pricing copy.
+It is not rendered on a service detail page at all; it is used in the nav dropdown and the
+cards, which live in the shared shell.
+
+Binding it would have rewritten a line of real pricing copy on six pages. A single
+occurrence is not evidence of a bind point — check *where* it occurs.
+
+### P6. A collection's listing can filter on a field, invisibly
+
+**Medium.** `/reviews` renders only reviews rated **4 and above**: zero of the 17
+published reviews rated below 4 appear, while all 152 rated 4+ are eligible (capped at 101
+by Webflow's list limit). The low-rated reviews keep their own pages and their live URLs.
+
+Nothing in the content model says this. It was found by diffing the rendered listing
+against the dump and noticing one review missing from an otherwise perfect date-descending
+sequence. §6 should prompt for it: a listing whose item count does not match the
+collection count is filtered, and the filter is part of the port.
+
+### P7. Collection ordering may exist nowhere in the API
+
+**Medium.** The skill warns about "a collection with NO order field, whose order lived
+only in the parent's reference array". Lux's team collection is worse: `seq` is null on
+every published member, there is no parent, and **Webflow's manual collection sort is not
+exposed by its API at all**.
+
+The rendered order (`andrew, alan, nethanel`) is neither alphabetical nor creation order,
+so it is genuinely a manual sort and genuinely unrecoverable from any dump. It had to be
+read off the rendered page and committed as a constant, then asserted in `verify.mjs`.
+
+§4 should name this third case and say that reading the rendered page is the legitimate
+last resort.
+
+### P8. Webflow's own JSON-LD can be invalid
+
+**Low, but free to fix.** The review template's JSON-LD interpolates the review body raw,
+and bodies contain newlines — so the string literal is unterminated and the block is
+invalid JSON on the live site. Regenerating structured data from the document rather than
+string-substituting into the frozen block fixes it for every page at no cost, and avoids
+the separate risk of patching four per-document values by hand and forgetting one.
+
+### P9. Dates must be bound on the RENDERED string, in Webflow's locale
+
+**Low.** The post template contains "April 16, 2023"; the ISO value appears nowhere.
+Formatting with `en-NZ` produces "16 April 2023" — arguably more correct for an Auckland
+clinic, and not what the published pages say. Matching the port comes first. Also set
+`timeZone: 'UTC'` or a midnight post shifts a day depending on where the build runs.
+
+## Suggested upstream order
+
+1. **P1** — the published test. It silently deletes live URLs and nothing downstream
+   notices.
+2. **E2**, **E9** — checks that cannot fail are worse than absent checks.
+3. **E5**, **E6**, **E7** — §5 is the step the skill calls non-optional, and three
+   separate defects made it report local bugs as Webflow's fault.
+4. **S1**, **S2** — Astro 7 reality; S2 ambushes §3, not §2.
+5. **S4**, **S5** — one leaves secrets committable, the other commits personal data.
+6. **E1**, **E3**, **E4**, **E10**, **P2**, **P3** — each cost real time on first
+   encounter.
+7. Everything else — tidy-ups.
+
+> [!NOTE]
+> Once the engine fixes land upstream, re-sync `migration-scripts/` and drop the local
+> patches so this repo stops carrying a fork. Current divergence:
+> `lib/html.mjs`, `extract-webflow-page.mjs`, `localise-webflow-assets.mjs`,
+> `check-assets.mjs`, `check-sitemap.mjs`, `sanity/test-converter.mjs`,
+> `sanity/test-portable.mjs`, plus the added `check-cms-images.mjs`. Everything else in
+> `migration-scripts/` is still byte-identical to the skill's copy.

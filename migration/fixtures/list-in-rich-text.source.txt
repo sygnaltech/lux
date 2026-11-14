@@ -1,0 +1,2 @@
+babyWeek.bullet-points / week-8-8
+A bare list as the whole field value, with no surrounding paragraph.

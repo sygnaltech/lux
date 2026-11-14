@@ -2134,7 +2134,7 @@ textarea.w-input, textarea.w-select {
 
 @font-face {
   font-family: Open Sans;
-  src: url("https://cdn.prod.website-files.com/60f0b32c84789d2d1b5ddbb8/6114628723fca46850edab57_OpenSans-Italic.ttf") format("truetype");
+  src: url("/wf/assets/6114628723fca46850edab57_OpenSans-Italic.ttf") format("truetype");
   font-weight: 400;
   font-style: italic;
   font-display: swap;
@@ -2142,7 +2142,7 @@ textarea.w-input, textarea.w-select {
 
 @font-face {
   font-family: Open Sans;
-  src: url("https://cdn.prod.website-files.com/60f0b32c84789d2d1b5ddbb8/61146287b7b7732227d73936_OpenSans-Regular.ttf") format("truetype");
+  src: url("/wf/assets/61146287b7b7732227d73936_OpenSans-Regular.ttf") format("truetype");
   font-weight: 400;
   font-style: normal;
   font-display: swap;
@@ -2150,7 +2150,7 @@ textarea.w-input, textarea.w-select {
 
 @font-face {
   font-family: Open Sans;
-  src: url("https://cdn.prod.website-files.com/60f0b32c84789d2d1b5ddbb8/611462860fda5037ac7565eb_OpenSans-Bold.ttf") format("truetype");
+  src: url("/wf/assets/611462860fda5037ac7565eb_OpenSans-Bold.ttf") format("truetype");
   font-weight: 700;
   font-style: normal;
   font-display: swap;
@@ -2158,7 +2158,7 @@ textarea.w-input, textarea.w-select {
 
 @font-face {
   font-family: Open Sans;
-  src: url("https://cdn.prod.website-files.com/60f0b32c84789d2d1b5ddbb8/611462874fcad298828abcb3_OpenSans-SemiBold.ttf") format("truetype");
+  src: url("/wf/assets/611462874fcad298828abcb3_OpenSans-SemiBold.ttf") format("truetype");
   font-weight: 600;
   font-style: normal;
   font-display: swap;
@@ -2546,7 +2546,7 @@ blockquote {
 
 .home-hero_banner {
   background-color: #2c2c2c;
-  background-image: linear-gradient(#276dc4e3, #276dc4e3), url("https://cdn.prod.website-files.com/60f0b32c84789d2d1b5ddbb8/6136d65a5fa4d51504e11fa0_family-2610205_1920%20(Medium).jpg");
+  background-image: linear-gradient(#276dc4e3, #276dc4e3), url("/wf/assets/6136d65a5fa4d51504e11fa0_family-2610205_1920-(Medium).jpg");
   background-position: 0 0, 50% 0;
   background-repeat: repeat, no-repeat;
   background-size: auto, cover;
@@ -2555,7 +2555,7 @@ blockquote {
 }
 
 .home-hero_banner.is-gray {
-  background-image: linear-gradient(#324153e3, #324153e3), url("https://cdn.prod.website-files.com/60f0b32c84789d2d1b5ddbb8/6136d65a5fa4d51504e11fa0_family-2610205_1920%20(Medium).jpg");
+  background-image: linear-gradient(#324153e3, #324153e3), url("/wf/assets/6136d65a5fa4d51504e11fa0_family-2610205_1920-(Medium).jpg");
   background-position: 0 0, 50% 0;
   background-repeat: repeat, no-repeat;
   background-size: auto, cover;
@@ -2625,7 +2625,7 @@ blockquote {
 }
 
 .top-icon.icon-2 {
-  background-image: url("https://cdn.prod.website-files.com/60f0b32c84789d2d1b5ddbb8/60f0b32c84789d8b305ddbf1_marker.png");
+  background-image: url("/wf/assets/60f0b32c84789d8b305ddbf1_marker.png");
   background-size: 63px;
 }
 
@@ -2636,7 +2636,7 @@ blockquote {
 }
 
 .top-icon.smaller.icon-3 {
-  background-image: url("https://cdn.prod.website-files.com/60f0b32c84789d2d1b5ddbb8/60f0b32c84789df7405ddbf5_mail.png");
+  background-image: url("/wf/assets/60f0b32c84789df7405ddbf5_mail.png");
   background-size: 45px;
 }
 
@@ -2811,7 +2811,7 @@ blockquote {
 .social-icon {
   opacity: .6;
   cursor: pointer;
-  background-image: url("https://cdn.prod.website-files.com/60f0b32c84789d2d1b5ddbb8/60f0b32c84789ded255ddbf2_fa-facebook_100_0_ffffff_none.png");
+  background-image: url("/wf/assets/60f0b32c84789ded255ddbf2_fa-facebook_100_0_ffffff_none.png");
   background-position: 50%;
   background-repeat: no-repeat;
   background-size: 13px;
@@ -2828,17 +2828,17 @@ blockquote {
 }
 
 .social-icon.twitter {
-  background-image: url("https://cdn.prod.website-files.com/60f0b32c84789d2d1b5ddbb8/60f0b32c84789dc5ce5ddbf4_fa-twitter_100_0_ffffff_none.png");
+  background-image: url("/wf/assets/60f0b32c84789dc5ce5ddbf4_fa-twitter_100_0_ffffff_none.png");
   background-size: 13px;
 }
 
 .social-icon.linkedin {
-  background-image: url("https://cdn.prod.website-files.com/60f0b32c84789d2d1b5ddbb8/61294fca6db1034ea222cb08_linkedin.svg");
+  background-image: url("/wf/assets/61294fca6db1034ea222cb08_linkedin.svg");
   background-size: 17px;
 }
 
 .social-icon.googleplus {
-  background-image: url("https://cdn.prod.website-files.com/60f0b32c84789d2d1b5ddbb8/60f0b32c84789d66d35ddbf3_font-awesome_4-6-3_google-plus_100_0_ffffff_none.png");
+  background-image: url("/wf/assets/60f0b32c84789d66d35ddbf3_font-awesome_4-6-3_google-plus_100_0_ffffff_none.png");
   background-size: 17px;
 }
 
@@ -2927,7 +2927,7 @@ blockquote {
 }
 
 .service-icon {
-  background-image: url("https://d3e54v103j8qbb.cloudfront.net/img/background-image.svg");
+  background-image: url("/wf/assets/background-image.svg");
   background-position: 50%;
   background-repeat: no-repeat;
   background-size: 100px;
@@ -3004,7 +3004,7 @@ blockquote {
 }
 
 .left-wrapper.photo {
-  background-image: url("https://cdn.prod.website-files.com/60f0b32c84789d2d1b5ddbb8/6104a42c43afc080cfad2970_x-ray.jpg");
+  background-image: url("/wf/assets/6104a42c43afc080cfad2970_x-ray.jpg");
   background-position: 50%;
   background-repeat: no-repeat;
   background-size: cover;
@@ -3053,7 +3053,7 @@ blockquote {
 }
 
 .testimonials-photo {
-  background-image: url("https://cdn.prod.website-files.com/60f0b32c84789d2d1b5ddbb8/60f0b32c84789d669b5ddbfb_test-1.jpg");
+  background-image: url("/wf/assets/60f0b32c84789d669b5ddbfb_test-1.jpg");
   background-position: 50%;
   background-repeat: no-repeat;
   background-size: cover;
@@ -3067,12 +3067,12 @@ blockquote {
 }
 
 .testimonials-photo.photo-2 {
-  background-image: url("https://cdn.prod.website-files.com/60f0b32c84789d2d1b5ddbb8/60f0b32c84789d32db5ddbfc_test-3.jpg");
+  background-image: url("/wf/assets/60f0b32c84789d32db5ddbfc_test-3.jpg");
   background-size: cover;
 }
 
 .testimonials-photo.photo-3 {
-  background-image: url("https://cdn.prod.website-files.com/60f0b32c84789d2d1b5ddbb8/60f0b32c84789d7c375ddbfd_test-4.jpg");
+  background-image: url("/wf/assets/60f0b32c84789d7c375ddbfd_test-4.jpg");
 }
 
 .quote {
@@ -3181,7 +3181,7 @@ blockquote {
   height: var(--btn-opening-hours-width);
   background-color: var(--brand-1);
   cursor: pointer;
-  background-image: url("https://cdn.prod.website-files.com/60f0b32c84789d2d1b5ddbb8/60f0b32c84789d1d395ddbf6_clock%20(1).png");
+  background-image: url("/wf/assets/60f0b32c84789d1d395ddbf6_clock-(1).png");
   background-position: 50%;
   background-repeat: no-repeat;
   background-size: 30px;
@@ -3259,7 +3259,7 @@ blockquote {
 .remove-button {
   cursor: pointer;
   background-color: #ff6853;
-  background-image: url("https://cdn.prod.website-files.com/60f0b32c84789d2d1b5ddbb8/60f0b32c84789d35f25ddbf7_cross-remove-sign.png");
+  background-image: url("/wf/assets/60f0b32c84789d35f25ddbf7_cross-remove-sign.png");
   background-position: 50%;
   background-repeat: no-repeat;
   background-size: 14px;
@@ -3314,7 +3314,7 @@ blockquote {
 
 .zoom-icon {
   background-color: #fff;
-  background-image: url("https://cdn.prod.website-files.com/60f0b32c84789d2d1b5ddbb8/60f0b32c84789de1285ddbec_magnifying-glass%20(2).png");
+  background-image: url("/wf/assets/60f0b32c84789de1285ddbec_magnifying-glass-(2).png");
   background-position: 50%;
   background-repeat: no-repeat;
   background-size: 22px;
@@ -3552,7 +3552,7 @@ blockquote {
 }
 
 .hero-image {
-  background-image: url("https://cdn.prod.website-files.com/60f0b32c84789d2d1b5ddbb8/61163a212ab1a52611bb551d_transparent.png");
+  background-image: url("/wf/assets/61163a212ab1a52611bb551d_transparent.png");
   background-position: 50%;
   background-size: cover;
   width: 100%;
@@ -3561,15 +3561,15 @@ blockquote {
 }
 
 .hero-image.contact {
-  background-image: url("https://cdn.prod.website-files.com/60f0b32c84789d2d1b5ddbb8/6104a3146bc8e3003566dfcf_auckland.jpg");
+  background-image: url("/wf/assets/6104a3146bc8e3003566dfcf_auckland.jpg");
 }
 
 .hero-image.about {
-  background-image: url("https://cdn.prod.website-files.com/60f0b32c84789d2d1b5ddbb8/6116f7723c76368816806690_vincent-guth-62V7ntlKgL8-unsplash%20(Medium).jpg");
+  background-image: url("/wf/assets/6116f7723c76368816806690_vincent-guth-62V7ntlKgL8-unsplash-(Medium).jpg");
 }
 
 .hero-image.referrer {
-  background-image: url("https://cdn.prod.website-files.com/60f0b32c84789d2d1b5ddbb8/6104a36a0f976cbe876648f3_referrer.jpg");
+  background-image: url("/wf/assets/6104a36a0f976cbe876648f3_referrer.jpg");
 }
 
 .image-2 {
@@ -3687,7 +3687,7 @@ blockquote {
 }
 
 .team-tile-image {
-  background-image: url("https://cdn.prod.website-files.com/60f0b32c84789d2d1b5ddbb8/612d9c5b2071a811f77d6157_icon.png");
+  background-image: url("/wf/assets/612d9c5b2071a811f77d6157_icon.png");
   background-position: 50%;
   background-size: cover;
   width: 100%;
@@ -4021,7 +4021,7 @@ blockquote {
 }
 
 .service-icon-2, .service-icon-2-copy {
-  background-image: url("https://d3e54v103j8qbb.cloudfront.net/img/background-image.svg");
+  background-image: url("/wf/assets/background-image.svg");
   background-position: 50%;
   background-repeat: no-repeat;
   background-size: 100px;
@@ -4270,7 +4270,7 @@ blockquote {
   background-color: var(--brand-2);
   color: var(--brand-4);
   letter-spacing: .5px;
-  background-image: url("https://cdn.prod.website-files.com/60f0b32c84789d2d1b5ddbb8/632ff2bb047920512bba2e10_grunge.png");
+  background-image: url("/wf/assets/632ff2bb047920512bba2e10_grunge.png");
   background-position: 100% 0;
   background-size: 540%;
   border-radius: 3px;
@@ -4617,20 +4617,20 @@ blockquote {
 }
 
 .section_hero {
-  background-image: url("https://cdn.prod.website-files.com/60f0b32c84789d2d1b5ddbb8/61163a212ab1a52611bb551d_transparent.png");
+  background-image: url("/wf/assets/61163a212ab1a52611bb551d_transparent.png");
   background-position: 50%;
   background-size: cover;
   height: 400px;
 }
 
 .section_hero.is-about {
-  background-image: url("https://cdn.prod.website-files.com/60f0b32c84789d2d1b5ddbb8/63f41977369f9e6e53f60871_2022-10-17%2010%2029%2012.webp");
+  background-image: url("/wf/assets/63f41977369f9e6e53f60871_2022-10-17-10-29-12.webp");
   background-position: 50% 6%;
   background-size: cover;
 }
 
 .section_hero.is-reviews {
-  background-image: url("https://cdn.prod.website-files.com/60f0b32c84789d2d1b5ddbb8/63f41977596f1afdc0f986fd_2022-10-17%2010%2037%2004.webp");
+  background-image: url("/wf/assets/63f41977596f1afdc0f986fd_2022-10-17-10-37-04.webp");
   background-position: 50% 10%;
   background-size: cover;
 }
@@ -5466,7 +5466,7 @@ blockquote {
 
 .team-img {
   aspect-ratio: 1;
-  background-image: url("https://cdn.prod.website-files.com/60f0b32c84789d2d1b5ddbb8/612d9c5b2071a811f77d6157_icon.png");
+  background-image: url("/wf/assets/612d9c5b2071a811f77d6157_icon.png");
   background-position: 50%;
   background-size: cover;
 }

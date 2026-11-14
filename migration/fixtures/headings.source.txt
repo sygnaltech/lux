@@ -1,0 +1,2 @@
+modal.content / labour-day
+Heading immediately followed by prose, no wrapper.

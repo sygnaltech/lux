@@ -109,7 +109,33 @@ const blocksOf = (pred) => all.filter(pred);
 
 const sourceAll = files.map((f) => readFileSync(join(FIXTURES, f), 'utf8')).join('\n');
 
-if (/<li[^>]*>[\s\S]*?<(ul|ol)\b/i.test(sourceAll)) {
+/**
+ * Per-fixture sources, for guards whose pattern can SPAN a file boundary.
+ *
+ * `sourceAll` joins every fixture, which is fine for a single-tag guard like
+ * `/<blockquote/` and wrong for anything with `[\s\S]*?` in it: an `<li>` in
+ * one fixture happily matches a `<ul>` in a different one, and the suite then
+ * asserts a construct the corpus does not contain. Use `anySource` for those.
+ */
+const sources = files.map((f) => readFileSync(join(FIXTURES, f), 'utf8'));
+const anySource = (re) => sources.some((s) => re.test(s));
+
+/**
+ * U+00A0 as an ESCAPE, never a literal byte.
+ *
+ * Both this and the guard below were literal U+00A0 characters and had been
+ * silently flattened to ordinary spaces somewhere in the file's history. The
+ * result was a guard that matched every fixture containing any space and an
+ * assertion that the text contained NO space — so the check failed on every
+ * corpus, for every site, and said "Webflow spacing was not normalised" while
+ * the converter was handling nbsp correctly.
+ *
+ * A non-ASCII character that matters must be written as an escape.
+ */
+const NBSP = ' ';
+const ZWNJ = '‌';
+
+if (anySource(/<li[^>]*>[\s\S]*?<(ul|ol)\b/i)) {
   const levels = blocksOf((x) => x.listItem).map((x) => x.level);
   check(
     'nested list produces level 2',
@@ -130,15 +156,15 @@ if (/<br\b/i.test(sourceAll)) {
   );
 }
 
-if (/&nbsp;| /.test(sourceAll)) {
+if (new RegExp(`&nbsp;|${NBSP}`).test(sourceAll)) {
   check(
     'no literal nbsp survives',
-    !portableTextToPlain(all).includes(' '),
+    !portableTextToPlain(all).includes(NBSP),
     'U+00A0 still present; Webflow spacing was not normalised',
   );
 }
 
-if (/‌|&zwnj;/.test(sourceAll)) {
+if (new RegExp(`${ZWNJ}|&zwnj;`).test(sourceAll)) {
   check(
     'U+200C-only paragraph produced no empty block',
     !all.some((x) => x._type === 'block' && !portableTextToPlain([x]).trim()),

@@ -1,0 +1,82 @@
+---
+/**
+ * /category/<slug> — 2 pages.
+ *
+ * Template extracted from `ultrasound`, which renders the most (40,876 bytes
+ * and 8 list regions against 7 elsewhere).
+ *
+ * ONLY `notes` IS RENDERED HERE. The collection also holds `brief` and
+ * `bookingNote`, both populated on both categories — and neither appears in
+ * this template. `bookingNote` turns up on the SERVICE pages instead, which is
+ * why it is bound there and not here. Binding it into one of this template's
+ * other `.w-richtext` regions would have looked perfectly fine and been wrong,
+ * which is why those regions are matched by content rather than by index.
+ */
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import {allCategories, imageUrl, sampleOf, type CategoryDoc} from '../../lib/cms';
+import {TEMPLATE_SAMPLE} from '../../lib/templates';
+import {renderPortableText} from '../../lib/portable';
+import {bindText, bindImage, bindBackgroundImage, bindRichTextByContent} from '../../lib/bind';
+
+const templates = import.meta.glob<string>('../../html/main.tpl-category.html', {
+  query: '?raw',
+  import: 'default',
+  eager: true,
+});
+const TEMPLATE = Object.values(templates)[0];
+
+export async function getStaticPaths() {
+  const categories = await allCategories();
+  const sample = sampleOf(categories, TEMPLATE_SAMPLE.category, 'category');
+  return categories.map((category) => ({
+    params: {slug: category.slug.current},
+    props: {category, sample},
+  }));
+}
+
+const {category, sample} = Astro.props as {category: CategoryDoc; sample: CategoryDoc};
+
+let body = TEMPLATE;
+
+/** Rich text first — see the note in src/pages/team/[slug].astro. */
+body = bindRichTextByContent(
+  body,
+  'category.notes',
+  renderPortableText(sample.notes as never, {wrapper: null}),
+  renderPortableText(category.notes as never, {wrapper: null}),
+);
+
+body = bindText(body, 'category.title', sample.title, category.title);
+
+/**
+ * The hero is a CSS background, not an <img>.
+ *
+ * The icon immediately beside it IS an `<img>`. Same content model, two
+ * different mechanisms, and only the template knows which — the first attempt
+ * used `bindImage` for both and the build failed on /category/x-ray, which is
+ * the outcome the throwing helpers exist to produce.
+ */
+body = bindBackgroundImage(
+  body,
+  'category.image',
+  '/wf/assets/611639e45a008b01ddd26228_niko-azhari-hidayat-a-FfDhFOcdU-unsplash-(Medium).jpg',
+  imageUrl(category.image, 1400),
+);
+
+body = bindImage(
+  body,
+  'category.icon',
+  '/wf/assets/612da8ded6de9daa8fbec26a_PhilipsEpiqEliteOBGYN.jpeg',
+  imageUrl(category.icon, 600),
+);
+
+const title = `Lux Radiology | ${category.title}`;
+---
+
+<BaseLayout
+  slug="tpl-category"
+  body={body}
+  title={title}
+  description={category.shortDescription?.slice(0, 155)}
+  canonicalPath={`/category/${category.slug.current}`}
+/>

@@ -1,0 +1,2 @@
+service.service-descirption / ultrasound-paediatric
+Non-breaking spaces inside sentences; naive text extraction turns them into literal \u00a0 or drops them.

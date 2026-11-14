@@ -29,10 +29,11 @@
     "sanity:import": "node migration-scripts/sanity/import.mjs",
     "sanity:verify": "node migration-scripts/sanity/verify.mjs",
     "test": "node migration-scripts/sanity/test-converter.mjs && node migration-scripts/sanity/test-portable.mjs",
-    "preflight": "npm run build && npm test && npm run check && npm run verify && npm run sitemap && npm run assets:check && npm run sanity:verify",
+    "preflight": "npm run build && npm test && npm run check && npm run verify && npm run sitemap && npm run assets:check && npm run cms:images && npm run sanity:verify",
     "engine:build": "npm --prefix engine run build --",
     "engine:watch": "npm --prefix engine run watch --",
-    "engine:test": "npm --prefix engine run test --"
+    "engine:test": "npm --prefix engine run test --",
+    "cms:images": "node migration-scripts/check-cms-images.mjs"
   },
   "author": {
     "name": "Michael Wells",

@@ -25,6 +25,13 @@ dist/
 # which does cover studio/dist and web/dist — listed for clarity).
 .sanity/
 
+# The raw Webflow dump. `migration-scripts/webflow/pull.mjs` documents this as
+# gitignored and it was NOT — which would have committed 216 review items,
+# including named individuals' review text and their Google avatar URLs, into
+# git history permanently. It is large, re-pullable with one command, and the
+# auditable artifact is the CONVERTED output, not the input.
+migration/raw/
+
 # Astro
 .astro/
 

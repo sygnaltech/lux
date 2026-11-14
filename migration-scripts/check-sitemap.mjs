@@ -146,7 +146,21 @@ check(
  * without an explicit canonical, which makes the structural mistake impossible;
  * this check covers the one it cannot, a canonical that is present and wrong.
  */
-const canonicalOf = (html) => html.match(/<link rel="canonical" href="([^"]*)"/)?.[1];
+/**
+ * ATTRIBUTE ORDER IS NOT GUARANTEED, so do not depend on it.
+ *
+ * This was `/<link rel="canonical" href="([^"]*)"/` and Webflow writes the
+ * attributes the other way round — `<link href="…" rel="canonical"/>`. The
+ * regex therefore matched nothing on a correctly ported site, which made
+ * "every page has a canonical" fail on every page AND made "every page is its
+ * own canonical" pass VACUOUSLY: it had no hrefs to compare, so it could never
+ * fail. A check that cannot fail is worse than no check, because it reads as
+ * reassurance.
+ */
+const canonicalOf = (html) => {
+  const tag = html.match(/<link\b[^>]*\brel="canonical"[^>]*>/i)?.[0];
+  return tag ? (tag.match(/\bhref="([^"]*)"/i)?.[1] ?? undefined) : undefined;
+};
 
 const wrongCanonical = [];
 const missingCanonical = [];

@@ -77,7 +77,20 @@ const rel = (f) => f.slice(DIST.length + 1).replace(/\\/g, '/');
 
 // --- 1. no Webflow hosts ---------------------------------------------------
 
-const WEBFLOW_HOSTS = /https?:\/\/[^"'\s)]*(?:website-files\.com|webflow\.io|assets\.website-files)/g;
+/**
+ * Hosts that mean the site still depends on the Webflow account.
+ *
+ * `d3e54v103j8qbb.cloudfront.net` is Webflow's static asset CDN. It belongs in
+ * this list and was missing: a site can pass a `website-files.com` audit while
+ * still loading images from Webflow, because the host name says "cloudfront"
+ * and nothing in it says "webflow". That is exactly the kind of residual this
+ * check exists to refuse to let through.
+ *
+ * Matched by its literal bucket id — a blanket `*.cloudfront.net` would also
+ * flag a client's own distribution, which is not a Webflow dependency.
+ */
+const WEBFLOW_HOSTS =
+  /https?:\/\/[^"'\s)]*(?:website-files\.com|webflow\.io|assets\.website-files|d3e54v103j8qbb\.cloudfront\.net)/g;
 
 const offenders = [];
 for (const file of files) {
@@ -93,7 +106,31 @@ check(
 
 // --- 2. every local asset reference resolves -------------------------------
 
-const LOCAL_REF = /(?:src|href)="(\/wf\/[^"]+)"|url\(["']?(\/wf\/[^"')]+)/g;
+/**
+ * Local `/wf/...` references, in an attribute or inside `url(...)`.
+ *
+ * THE `url()` BRANCH MUST NOT SIMPLY EXCLUDE `)`.
+ *
+ * Webflow filenames routinely contain parentheses — `clock (1).png`,
+ * `photo (Medium).jpeg` — and they survive localisation into the local name.
+ * A class like `[^"')]+` truncates `…clock-(1).png` to `…clock-(1`, which then
+ * fails the exists-on-disk check and reports a missing asset that is sitting
+ * right there, correctly referenced, in the CSS. Four of this site's assets
+ * failed exactly that way.
+ *
+ * So: quoted forms stop at their own quote (the common case — Webflow writes
+ * `url("…")`), and the unquoted form treats `)` as the terminator only when
+ * what follows is end-of-value punctuation rather than more filename.
+ */
+const LOCAL_REF = new RegExp(
+  [
+    String.raw`(?:src|href)="(\/wf\/[^"]+)"`,
+    String.raw`url\(\s*"(\/wf\/[^"]+)"`,
+    String.raw`url\(\s*'(\/wf\/[^']+)'`,
+    String.raw`url\(\s*(\/wf\/(?:\)(?![\s;,}]|$)|[^"'\s)])+)`,
+  ].join('|'),
+  'g',
+);
 
 /**
  * Local references that are KNOWN to be missing, with the reason.
@@ -123,11 +160,41 @@ const knownGaps = new Set();
 for (const file of files) {
   const text = await readFile(file, 'utf8');
   for (const m of text.matchAll(LOCAL_REF)) {
-    const ref = decodeURIComponent((m[1] ?? m[2]).split('?')[0]);
-    if (await exists(join(DIST, ref.replace(/^\//, '')))) continue;
-    const why = knownMissingReason(ref);
+    // Four alternatives in LOCAL_REF: attribute, url("…"), url('…'), url(…).
+    const raw = (m[1] ?? m[2] ?? m[3] ?? m[4]).split('?')[0];
+
+    /**
+     * TRY THE REFERENCE BOTH ENCODED AND DECODED.
+     *
+     * Webflow is not consistent about percent-encoding its own filenames, and
+     * `localName` in the localiser decodes exactly once. A singly-encoded name
+     * (`clock%20(1).png`) lands on disk as `clock-(1).png`, while a DOUBLY
+     * encoded one (`wilson%2520car%2520park…`) lands as the literal
+     * `wilson%20car%20park…` — percent signs and all.
+     *
+     * Decoding before the disk probe therefore turns a correct reference into
+     * a phantom missing asset: the file is right there, the HTML points at it
+     * correctly, and the check invents a failure. Accept either form.
+     */
+    const candidates = new Set([raw]);
+    try {
+      candidates.add(decodeURIComponent(raw));
+    } catch {
+      // A malformed escape is not decodable; the raw form is the only candidate.
+    }
+
+    let found = false;
+    for (const ref of candidates) {
+      if (await exists(join(DIST, ref.replace(/^\//, '')))) {
+        found = true;
+        break;
+      }
+    }
+    if (found) continue;
+
+    const why = knownMissingReason(raw);
     if (why) knownGaps.add(`      ${why}`);
-    else missing.add(`      ${ref}   (referenced by ${rel(file)})`);
+    else missing.add(`      ${raw}   (referenced by ${rel(file)})`);
   }
 }
 check(

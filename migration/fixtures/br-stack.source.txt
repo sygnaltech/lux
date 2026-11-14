@@ -1,0 +1,2 @@
+modal.content / we-will-be-starting-a-new-1st-saturday-of-the-month-scan-list
+Consecutive <br> used as paragraph spacing. Collapsing them silently joins sentences.

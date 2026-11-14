@@ -1,0 +1,2 @@
+post.post-body / ponsonbys-new-radiology-service
+An internal link written as an absolute https://www.<host>/ URL, which must be rewritten to a path.

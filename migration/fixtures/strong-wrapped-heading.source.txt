@@ -1,0 +1,2 @@
+modal.content / saturday-scans
+A <strong> wrapping an entire heading — a block whose only child is a mark.

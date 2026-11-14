@@ -1,0 +1,136 @@
+---
+/**
+ * /services/<slug> — 7 pages.
+ *
+ * Template extracted from `pregnancy-scan`, the richest service (39,415 bytes
+ * against 36,529 for the next).
+ *
+ * SIX `.w-richtext` REGIONS, and only two belong to this document: the service
+ * description, and the booking note that comes from the service's CATEGORY.
+ * The other four are static furniture repeated across several templates (the
+ * online-booking blurb, the 3D/4D gift blurb, and so on). That is why every
+ * rich-text binding here matches on content: picking an index would be a
+ * coin-flip that renders convincingly either way.
+ *
+ * Note that one of the seven services — `ultrasound-guided-injections` — is a
+ * Webflow DRAFT that was published once and is still being served. It is in
+ * the live sitemap and must have a page; see `isPublished` in
+ * migration-scripts/webflow/collections.mjs.
+ */
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import {allServices, allCategories, imageUrl, sampleOf, type ServiceDoc, type CategoryDoc} from '../../lib/cms';
+import {TEMPLATE_SAMPLE} from '../../lib/templates';
+import {renderPortableText} from '../../lib/portable';
+import {bindText, bindImage, bindRichTextByContent} from '../../lib/bind';
+
+const templates = import.meta.glob<string>('../../html/main.tpl-services.html', {
+  query: '?raw',
+  import: 'default',
+  eager: true,
+});
+const TEMPLATE = Object.values(templates)[0];
+
+export async function getStaticPaths() {
+  const [services, categories] = await Promise.all([allServices(), allCategories()]);
+  const sample = sampleOf(services, TEMPLATE_SAMPLE.service, 'service');
+  const sampleCategory = categories.find((c) => c.slug.current === sample.category?.slug.current);
+
+  return services.map((service) => ({
+    params: {slug: service.slug.current},
+    props: {
+      service,
+      sample,
+      sampleCategory,
+      // The booking note shown on a service page belongs to that service's
+      // category, so each page needs its own.
+      category: categories.find((c) => c.slug.current === service.category?.slug.current),
+    },
+  }));
+}
+
+const {service, sample, sampleCategory, category} = Astro.props as {
+  service: ServiceDoc;
+  sample: ServiceDoc;
+  sampleCategory?: CategoryDoc;
+  category?: CategoryDoc;
+};
+
+let body = TEMPLATE;
+
+/** Rich text first — see the note in src/pages/team/[slug].astro. */
+body = bindRichTextByContent(
+  body,
+  'service.description',
+  renderPortableText(sample.description as never, {wrapper: null}),
+  renderPortableText(service.description as never, {wrapper: null}),
+);
+
+/**
+ * The category's booking note.
+ *
+ * Rendered on the service page, not the category page — established by finding
+ * its text in this template and NOT in the category one. Bound only when both
+ * the sample's category and this service's category have one, so a service in
+ * a category without a note leaves the region alone rather than blanking
+ * copy that is still correct.
+ */
+if (sampleCategory?.bookingNote && category?.bookingNote) {
+  body = bindRichTextByContent(
+    body,
+    'category.bookingNote',
+    renderPortableText(sampleCategory.bookingNote as never, {wrapper: null}),
+    renderPortableText(category.bookingNote as never, {wrapper: null}),
+  );
+}
+
+body = bindText(body, 'service.title', sample.title, service.title);
+
+/**
+ * `shortName` is NOT bound, and that is deliberate.
+ *
+ * It is not rendered on a service detail page. Its only appearance in this
+ * template was the string "Pregnancy Scans" inside the description's own price
+ * list — a coincidence, not a bind point, and binding it would have rewritten
+ * a line of the client's pricing copy on six pages.
+ *
+ * Where it IS used is the navigation's services dropdown and the service
+ * cards, both of which live in the shared shell rather than in this template.
+ *
+ * `shortDescription` is likewise unrendered here; it is carried in the meta
+ * description below instead, which is where it was being used.
+ */
+
+/**
+ * The hero image and the icon.
+ *
+ * `pageImage` is populated on only 4 of 7 services, so a service without one
+ * gets a blanked `src` rather than the sample's photograph — a missing image
+ * is visible and fixable; the wrong service's hero is neither.
+ *
+ * `icon` is Webflow's `icon-image` field. Its older sibling `icon` ("Icon 2")
+ * is populated on all 7 and rendered nowhere, and was not migrated.
+ */
+body = bindImage(
+  body,
+  'service.pageImage',
+  '/wf/assets/63f41f981c14d86bc8fb3140_2022-10-17-10-43-30.webp',
+  imageUrl(service.pageImage, 1400),
+);
+
+body = bindImage(
+  body,
+  'service.icon',
+  '/wf/assets/6322ea528b6f1268e67e2845_096-pregnant.svg',
+  imageUrl(service.icon, 200),
+);
+
+const title = `${service.title} | Lux Radiology | Auckland`;
+---
+
+<BaseLayout
+  slug="tpl-services"
+  body={body}
+  title={title}
+  description={service.shortDescription?.slice(0, 155)}
+  canonicalPath={`/services/${service.slug.current}`}
+/>

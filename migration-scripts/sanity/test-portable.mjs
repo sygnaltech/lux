@@ -93,9 +93,19 @@ for (const file of files) {
 const sourceAll = files.map((f) => readFileSync(join(FIXTURES, f), 'utf8')).join('\n');
 const outAll = Object.values(rendered).join('\n');
 
-// --- structure, where the corpus exercises it ------------------------------
+/**
+ * Per-fixture sources, for guards whose pattern can SPAN a file boundary.
+ *
+ * `sourceAll` joins every fixture, which is fine for a single-tag guard like
+ * `/<blockquote/` and wrong for anything containing `[\s\S]*?`: an `<li>` in
+ * one fixture matches a `<ul>` in a DIFFERENT one, and the suite then demands
+ * a construct the corpus does not contain. The same bug exists in
+ * test-converter.mjs and is fixed the same way.
+ */
+const sources = files.map((f) => readFileSync(join(FIXTURES, f), 'utf8'));
+const anySource = (re) => sources.some((s) => re.test(s));
 
-if (/<li[^>]*>[\s\S]*?<(ul|ol)\b/i.test(sourceAll)) {
+if (anySource(/<li[^>]*>[\s\S]*?<(ul|ol)\b/i)) {
   check(
     'emits a nested list inside an <li>',
     /<li>[^<]*<(ul|ol)\b/.test(outAll),

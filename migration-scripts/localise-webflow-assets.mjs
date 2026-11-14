@@ -75,9 +75,56 @@ const dryRun = process.argv.includes('--dry-run');
  * Webflow filenames routinely contain parentheses and percent-escaped spaces,
  * so the HTML pattern must NOT exclude `)`.
  */
-const WF_HOST = String.raw`https:\/\/(?:[a-z0-9.-]*\.)?website-files\.com\/`;
-const WF_IN_HTML = new RegExp(`${WF_HOST}[^"'\\s]+`, 'g');
-const WF_IN_CSS = new RegExp(`${WF_HOST}[^"')\\s]+`, 'g');
+/**
+ * Every host that is WEBFLOW INFRASTRUCTURE, not just the obvious one.
+ *
+ * `d3e54v103j8qbb.cloudfront.net` is Webflow's static asset CDN and is easy to
+ * miss precisely because the name says "cloudfront", not "webflow": an audit
+ * that greps for `website-files.com` reports the site clean while it is still
+ * loading images from Webflow. On this site it serves a background SVG from
+ * inside the ported stylesheet.
+ *
+ * The opaque bucket id is matched literally rather than by a wildcard, because
+ * a broad `*.cloudfront.net` would also sweep up a client's own CloudFront
+ * distribution, which is not ours to rewrite.
+ */
+const WF_HOST = String.raw`https:\/\/(?:(?:[a-z0-9.-]*\.)?website-files\.com|d3e54v103j8qbb\.cloudfront\.net)\/`;
+
+/**
+ * Terminators common to both contexts.
+ *
+ * `&quot;` AND FRIENDS ARE IN HERE FOR A REASON. Webflow writes CSS into HTML
+ * `style` attributes, and the quotes inside `url(...)` are then HTML-escaped:
+ *
+ *     style="background-image:url(&quot;https://…/icon.svg&quot;)"
+ *
+ * A class like `[^"'\s]+` sees no `"` there at all — `&`, `q`, `u`, `o`, `t`,
+ * `;` and `)` are all "allowed" — so it swallows `&quot;)` onto the end of the
+ * URL. The fetch then 403s, and the failure reads as Webflow refusing an asset
+ * rather than as a pattern bug here. Six of this site's assets failed that way.
+ */
+const TERM = String.raw`(?:&quot;|&#0*34;|&apos;|&#0*39;|["'\s])`;
+
+/** HTML: the URL sits in an attribute. Parentheses are legal IN the filename. */
+const WF_IN_HTML = new RegExp(`${WF_HOST}(?:(?!${TERM}).)+`, 'g');
+
+/**
+ * CSS: the URL sits inside `url(...)`, so `)` can end it — but ONLY the `)`
+ * that closes the function, never one inside the filename.
+ *
+ * Webflow filenames routinely contain percent-escaped spaces and parentheses:
+ * `clock%20(1).png`, `photo%20(Medium).jpeg`. A pattern that simply excludes
+ * `)` truncates them mid-name — `…clock%20(1` — and then reports a 403 from
+ * Webflow instead of the local bug it is. Four of this site's assets failed
+ * that way, and all four fetch 200 once the URL is complete.
+ *
+ * So a `)` is consumed when it is followed by more filename, and treated as
+ * the terminator only when what follows it is end-of-value punctuation.
+ */
+const WF_IN_CSS = new RegExp(
+  `${WF_HOST}(?:(?!${TERM})(?:\\)(?![\\s;,}]|$)|[^)]))+`,
+  'g',
+);
 
 /**
  * Assets that CANNOT be fetched, with the reason.
