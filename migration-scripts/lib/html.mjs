@@ -78,4 +78,53 @@ export function findSpan(spans, tag, cls) {
   return matches.find((s) => !matches.some((o) => o !== s && o.start < s.start && o.end > s.end));
 }
 
+/**
+ * The INNERMOST `tag` span that wraps an element carrying class `childCls`.
+ *
+ * For shell elements that have NO class of their own. Webflow emits these
+ * routinely: on the site this was added for, every page begins
+ * `<body><div><div class="mobile-navigation …">`, where that bare `<div>` is
+ * the entire navigation region — a mobile navbar, a desktop navbar, a sticky
+ * scroll navbar, a mobile section and an alert bar, all as siblings inside it.
+ * There is no class anywhere that covers the set, so `findSpan` cannot address
+ * it and the whole region would otherwise land in every page's main fragment.
+ *
+ * INNERMOST, not outermost — the opposite of `findSpan`, and deliberately so.
+ * Every ancestor up to `<body>` also "contains" the marker child, so the
+ * outermost match is whatever the page's top-level wrapper happens to be. On
+ * that same site one page nests everything in `div.page_wrapper`, so asking
+ * for the outermost would have returned the entire page there and the nav
+ * region everywhere else — a difference that only shows up as a shared-shell
+ * mismatch on one page out of eighteen.
+ *
+ * Pick `childCls` to be a class that appears ONCE inside the intended wrapper
+ * and nowhere above it.
+ */
+export function findSpanWrapping(spans, tag, childCls) {
+  const marker = spans.find((s) => hasClass(s.attrs, childCls));
+  if (!marker) return undefined;
+
+  /**
+   * STRICTLY outside the marker — `<` and `>`, never `<=` and `>=`.
+   *
+   * The marker is usually the same tag as its wrapper (a `div` inside a
+   * `div`), so a non-strict comparison matches the marker ITSELF and, being
+   * the innermost match, wins. The wrapper is then never found and the
+   * "shared" fragment is just the marker element.
+   *
+   * That was written `<=` first and the symptom was a nav.html of 2,897 bytes
+   * instead of 10,277 — the mobile navbar alone, with the rest of the nav
+   * region left duplicated in every page's main fragment. It RENDERED
+   * PERFECTLY, so the only signal was a shared file too small to be a nav.
+   * Exactly the `\bfooter\b` failure described above, via a different route.
+   */
+  const candidates = spans.filter(
+    (s) => s.tag === tag && s.start < marker.start && s.end > marker.end,
+  );
+  if (candidates.length === 0) return undefined;
+
+  // Innermost = the latest-starting strict ancestor.
+  return candidates.reduce((best, s) => (s.start > best.start ? s : best));
+}
+
 export { VOID };

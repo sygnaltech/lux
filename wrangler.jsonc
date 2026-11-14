@@ -23,10 +23,12 @@
 	// `not_found_handling` must come out of both. See §8.
 
 	"assets": {
-		// Astro 7 + the Cloudflare adapter split the output: the servable files
-		// are in dist/CLIENT, not dist. Pointing this at ./web/dist serves an
-		// empty directory and every route 404s with nothing in the logs.
-		"directory": "./web/dist/client",
+		// Flat by configuration, not by default: astro.config.mjs sets
+		// `build.client: './'` so pages land directly here rather than in
+		// dist/client, which is what the migration engine's verifiers assume.
+		// Astro's server output is pushed to dist/_server and ignored via
+		// web/public/.assetsignore.
+		"directory": "./web/dist",
 
 		// Correct ONLY because every route prerenders. The asset layer answers
 		// "404-page" BEFORE any Worker runs, so with an on-demand route this

@@ -43,7 +43,7 @@ import { fileURLToPath } from 'node:url';
 import { PAGES, TEMPLATES, SHELL } from './pages.config.mjs';
 import { WEBFLOW_SOURCE } from './lib/project.mjs';
 import { userAgent } from './lib/ua.mjs';
-import { scanSpans, findSpan } from './lib/html.mjs';
+import { scanSpans, findSpan, findSpanWrapping } from './lib/html.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const WEB = join(ROOT, 'web');
@@ -76,6 +76,28 @@ const stripCurrent = (html) =>
     .replace(/ aria-current="page"/g, '')
     .replace(/\s*\bw--current\b/g, '')
     .replace(/ class="\s*"/g, '');
+
+/**
+ * Resolve one SHELL entry to a span. Two ways to address an element:
+ *
+ *   { tag, cls }       the element carries the class itself — the normal case.
+ *   { tag, childCls }  the element has NO class, and is identified as the
+ *                      innermost `tag` wrapping something that does.
+ *
+ * The second form exists because Webflow frequently emits an unclassed
+ * wrapper around a whole shell region. Without it such a region cannot be
+ * punched out, and it silently duplicates into every page's main fragment —
+ * which still renders perfectly, so nothing catches it.
+ */
+function findShell(spans, entry) {
+  if (!entry) return undefined;
+  return entry.childCls
+    ? findSpanWrapping(spans, entry.tag, entry.childCls)
+    : findSpan(spans, entry.tag, entry.cls);
+}
+
+const describeShell = (entry) =>
+  entry?.childCls ? `${entry.tag} wrapping .${entry.childCls}` : `${entry?.tag}.${entry?.cls}`;
 
 function meta(head, key) {
   const attr = key.startsWith('og:') ? 'property' : 'name';
@@ -216,11 +238,11 @@ for (const target of targets) {
   const body = raw.slice(bodyStart, raw.lastIndexOf('</body>'));
 
   const spans = scanSpans(body);
-  const nav = findSpan(spans, SHELL.nav.tag, SHELL.nav.cls);
-  const footer = findSpan(spans, SHELL.footer.tag, SHELL.footer.cls);
+  const nav = findShell(spans, SHELL.nav);
+  const footer = findShell(spans, SHELL.footer);
 
-  if (!nav) console.error(`WARN  ${target.path}: no ${SHELL.nav.tag}.${SHELL.nav.cls} found`);
-  if (!footer) console.error(`WARN  ${target.path}: no ${SHELL.footer.tag}.${SHELL.footer.cls} found`);
+  if (!nav) console.error(`WARN  ${target.path}: no ${describeShell(SHELL.nav)} found`);
+  if (!footer) console.error(`WARN  ${target.path}: no ${describeShell(SHELL.footer)} found`);
 
   // Keep the WHOLE body and punch out the shell subtrees, rather than slicing
   // between them — the nav is frequently nested inside the hero section.

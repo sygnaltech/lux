@@ -75,7 +75,32 @@ export default defineConfig({
    * matching how Webflow serves them. Changing this silently changes every URL
    * on the site and breaks the §7 sitemap diff against live.
    */
-  build: {format: 'file'},
+  build: {
+    /**
+     * `file` keeps URLs extensionless and directory-free — /about, not /about/ —
+     * matching how Webflow serves them. Changing this silently changes every URL
+     * on the site and breaks the §7 sitemap diff against live.
+     */
+    format: 'file',
+
+    /**
+     * FLATTEN THE OUTPUT TO dist/, NOT dist/client/.
+     *
+     * With an adapter present Astro defaults `build.client` to './client/',
+     * so pages land in web/dist/client/about.html. The whole migration engine
+     * assumes a flat web/dist — `verify-port`, `check-assets` and
+     * `check-sitemap` all compute `join(WEB, 'dist')` and look for
+     * `<page>.html` directly inside it. Three engine files would need forking
+     * to teach them otherwise, against one line here.
+     *
+     * Both paths are relative to `outDir`. The server directory is renamed
+     * too, so it cannot collide with a real page route: `output: 'static'`
+     * with no on-demand route leaves it empty, but it must still be ignored
+     * by the asset layer — see web/public/.assetsignore.
+     */
+    client: './',
+    server: './_server/',
+  },
 
   vite: {
     /**

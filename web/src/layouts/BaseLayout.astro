@@ -1,0 +1,161 @@
+---
+/**
+ * The shell for every ported Webflow page.
+ *
+ * Takes a slug, looks it up in the extractor's manifest, and re-emits the page:
+ * Webflow's own <head> furniture, then the verbatim body fragment with the
+ * `<!--wf:nav-->` / `<!--wf:footer-->` markers substituted for the shared nav
+ * and footer.
+ *
+ * FRAGMENTS ARE LOADED WITH import.meta.glob + ?raw, NOT readFile.
+ *
+ * Vite inlines them into the bundle at build time, so this works regardless of
+ * what runtime prerenders the page. A `readFile` here would fail under the
+ * Cloudflare adapter's workerd prerenderer, whose cwd is `/bundle` with no
+ * repository filesystem — the same wall that broke the project.jsonc read.
+ * `eager: true` because every page needs its fragment synchronously during
+ * render.
+ *
+ * NOTHING IN THE BODY IS RECONSTRUCTED. The fragments are the live site's
+ * bytes with only asset URLs rewritten. Resist improving the markup here: the
+ * CSS is Webflow's, selector- and generated-id-driven, and a hand-written
+ * equivalent is a redesign with a migration's budget.
+ */
+import manifest from '../data/pages.json';
+
+interface Props {
+  /** Manifest key — e.g. 'home', 'about', 'book/sat'. */
+  slug: string;
+}
+
+const {slug} = Astro.props;
+
+const page = (manifest.pages as Record<string, PageEntry>)[slug];
+if (!page) {
+  throw new Error(
+    `BaseLayout: no manifest entry for slug "${slug}". ` +
+      `Known slugs: ${Object.keys(manifest.pages).join(', ')}`,
+  );
+}
+
+interface PageEntry {
+  path: string;
+  template: boolean;
+  wfPage?: string;
+  lang?: string;
+  title?: string;
+  description?: string;
+  ogTitle?: string;
+  ogDescription?: string;
+  shell: 'full' | 'nav' | 'bare';
+  headExtra?: boolean;
+}
+
+/**
+ * Every extracted fragment, keyed by its path within src/html.
+ *
+ * A slug containing `/` is stored with `__` in the filename — `book/sat`
+ * becomes `main.book__sat.html` — because a slash in a filename would be a
+ * directory. The extractor does the same mapping on the way out.
+ */
+const fragments = import.meta.glob<string>('../html/*.html', {
+  query: '?raw',
+  import: 'default',
+  eager: true,
+});
+
+const fileFor = (s: string) => s.replace(/\//g, '__');
+const frag = (name: string): string => fragments[`../html/${name}`] ?? '';
+
+const main = frag(`main.${fileFor(slug)}.html`);
+const nav = frag('nav.html');
+const footer = frag('footer.html');
+const headCustom = frag('head-custom.html');
+const headExtra = page.headExtra ? frag(`head-extra.${fileFor(slug)}.html`) : '';
+
+if (!main) throw new Error(`BaseLayout: no main fragment for slug "${slug}".`);
+
+/**
+ * Substitute the shell markers.
+ *
+ * THESE MUST THROW WHEN THE SUBSTITUTION CANNOT HAPPEN, and that is the whole
+ * design. A silent fallback leaves the comment marker in the output and the
+ * page renders without a nav — which looks like a CSS problem, not a build
+ * problem, and the structural verifier's tag count would be the only hint.
+ *
+ * A `bare` page legitimately has no markers (Webflow's /410 and /search render
+ * no site chrome), so the check is per-shell rather than unconditional.
+ */
+function substitute(html: string): string {
+  let out = html;
+
+  if (page.shell === 'full' || page.shell === 'nav') {
+    if (!out.includes('<!--wf:nav-->')) {
+      throw new Error(`BaseLayout: "${slug}" is shell:${page.shell} but its fragment has no <!--wf:nav--> marker.`);
+    }
+    if (!nav) throw new Error(`BaseLayout: "${slug}" needs the shared nav, but nav.html is empty.`);
+    out = out.replace('<!--wf:nav-->', nav);
+  }
+
+  if (page.shell === 'full') {
+    if (!out.includes('<!--wf:footer-->')) {
+      throw new Error(`BaseLayout: "${slug}" is shell:full but its fragment has no <!--wf:footer--> marker.`);
+    }
+    if (!footer) throw new Error(`BaseLayout: "${slug}" needs the shared footer, but footer.html is empty.`);
+    out = out.replace('<!--wf:footer-->', footer);
+  }
+
+  return out;
+}
+
+const body = substitute(main);
+
+/**
+ * Webflow's site identifier, constant across every page of this site.
+ *
+ * It is on the live `<html>` element and is kept for fidelity: Webflow's
+ * shipped runtime reads it, and the ported pages still load that runtime.
+ * It is NOT in the extractor's manifest (which captures only `data-wf-page`
+ * and `lang`), and it does not belong in project.jsonc either — that file is
+ * for what the migration ENGINE needs, not for markup constants.
+ */
+const WF_SITE = '60f0b32c84789d2d1b5ddbb8';
+
+/** data-wf-domain is the canonical host, which is the live host. */
+const wfDomain = new URL(manifest.extractedFrom).hostname;
+---
+
+<html
+  data-wf-domain={wfDomain}
+  data-wf-page={page.wfPage}
+  data-wf-site={WF_SITE}
+  lang={page.lang ?? 'en'}
+>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    {/*
+      Interpolated, NOT set:html. The manifest stores DECODED text, so Astro
+      escapes exactly once here. The extractor used to store the raw <title>
+      — already HTML-escaped — and this escaped it again, so pages rendered a
+      literal "&amp;" in the browser tab. Three Lux titles contain "&".
+    */}
+    <title>{page.title}</title>
+    {page.description && <meta name="description" content={page.description} />}
+    {page.ogTitle && <meta property="og:title" content={page.ogTitle} />}
+    {page.ogDescription && <meta property="og:description" content={page.ogDescription} />}
+    {page.ogTitle && <meta name="twitter:title" content={page.ogTitle} />}
+    {page.ogDescription && <meta name="twitter:description" content={page.ogDescription} />}
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+
+    <Fragment set:html={headCustom} />
+    <Fragment set:html={headExtra} />
+  </head>
+
+  <body>
+    <Fragment set:html={body} />
+    <slot />
+  </body>
+</html>

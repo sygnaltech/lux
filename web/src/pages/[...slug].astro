@@ -1,0 +1,33 @@
+---
+/**
+ * Every ported static page except the home page.
+ *
+ * One generated route over the extractor's manifest, so adding a page to
+ * migration-scripts/pages.config.mjs and re-running `npm run extract` is the
+ * whole job — there is no per-page file to forget.
+ *
+ * EXCLUDED FROM THIS ROUTE:
+ *   home       has its own src/pages/index.astro (most CMS lists on the site,
+ *              plus its own JSON-LD), and `/` is not a catch-all param.
+ *   templates  collection templates have no route of their own. Their
+ *              extracted furniture is consumed by the §6 CMS routes, which
+ *              render one page per Sanity document.
+ */
+import manifest from '../data/pages.json';
+import BaseLayout from '../layouts/BaseLayout.astro';
+
+interface PageEntry {
+  path: string;
+  template: boolean;
+}
+
+export function getStaticPaths() {
+  return Object.entries(manifest.pages as Record<string, PageEntry>)
+    .filter(([slug, page]) => !page.template && slug !== 'home')
+    .map(([slug]) => ({params: {slug}}));
+}
+
+const {slug} = Astro.params;
+---
+
+<BaseLayout slug={slug!} />

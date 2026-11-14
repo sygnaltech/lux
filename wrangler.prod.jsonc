@@ -47,10 +47,12 @@
 	],
 
 	"assets": {
-		// dist/CLIENT, not dist — Astro 7 + the Cloudflare adapter split the
-		// output into client/ and server/. Pointing at ./web/dist serves an
-		// empty directory and 404s every route with nothing in the logs.
-		"directory": "./web/dist/client",
+		// Flat by configuration, not by default: astro.config.mjs sets
+		// `build.client: './'` so pages land directly here rather than in
+		// dist/client, which is what the migration engine's verifiers assume.
+		// Astro's server output is pushed to dist/_server and ignored via
+		// web/public/.assetsignore.
+		"directory": "./web/dist",
 
 		// Correct ONLY while every route prerenders — verified by there being
 		// no `prerender = false` in web/src and an empty dist/server.

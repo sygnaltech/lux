@@ -13,6 +13,13 @@
 _worker.js
 _routes.json
 
+# Astro's server output. `build.server` is set to './_server/' in
+# astro.config.mjs because `build.client` was flattened to the dist root, so
+# the two would otherwise collide. It is empty while every route prerenders,
+# but it must never be servable — if §6 introduces an on-demand route this is
+# where the Worker code lands, and publishing it would expose server-side code.
+_server
+
 # @astrojs/cloudflare writes its OWN generated wrangler config into the client
 # output directory. It is not used for deployment — the real configs are
 # wrangler.jsonc and wrangler.prod.jsonc at the repository root — but it sits

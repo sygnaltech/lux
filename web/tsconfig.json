@@ -1,9 +1,25 @@
 {
   "extends": "astro/tsconfigs/strict",
   "include": [".astro/types.d.ts", "**/*"],
-  "exclude": ["dist"],
+  "exclude": [
+    "dist",
+
+    // The PORTED WEBFLOW BUNDLES. `allowJs` is on (src/lib/project.mjs is
+    // .mjs), and `include: ["**/*"]` otherwise drags Webflow's minified
+    // jQuery and webpack chunks into the type check — ~215KB of diagnostics
+    // about code we did not write, will never edit, and ship verbatim. It
+    // also made `astro check` slow enough to look broken.
+    //
+    // Nothing here is authored by us: public/ is copied byte-for-byte into
+    // the build output, and these files are re-fetched by
+    // `npm run fetch:assets`.
+    "public/wf"
+  ],
   "compilerOptions": {
     "allowJs": true,
-    "strictNullChecks": true
+    "strictNullChecks": true,
+
+    // The manifest is imported directly by BaseLayout and [...slug].astro.
+    "resolveJsonModule": true
   }
 }
