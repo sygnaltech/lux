@@ -31,7 +31,7 @@
 
 	// Staging review happens on the *.workers.dev URL with the route still
 	// commented out. Keep this true until after cut-over.
-	"workers_dev": true,
+	"workers_dev": false,
 
 	// NO "main". `output: 'static'` with no on-demand route emits an empty
 	// dist/server — there is no Worker, and this is an assets-only deployment.
