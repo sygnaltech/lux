@@ -39,11 +39,10 @@
 	// AND remove `not_found_handling` below, in the same change.
 
 	"routes": [
-		// ⚠ THE CUT-OVER. Uncomment only when explicitly authorised.
-		// {
-		// 	"pattern": "www.luxradiology.co.nz",
-		// 	"custom_domain": true
-		// }
+		{
+			"pattern": "www.luxradiology.co.nz",
+			"custom_domain": true
+		}
 	],
 
 	"assets": {
