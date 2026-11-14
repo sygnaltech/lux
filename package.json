@@ -1,21 +1,38 @@
 {
-  "name": "dev-template",
-  "version": "0.1.0",
-  "description": "",
-  "main": "dist/index.js",
+  "name": "lux-radiology",
+  "version": "0.1.1",
+  "private": true,
+  "description": "Lux Radiology — Webflow to Astro + Sanity migration. This root package is an ORCHESTRATOR: it owns the migration engine, both Wrangler configs and the deploy guards, and delegates app commands to web/ and studio/.",
+  "type": "module",
   "scripts": {
-    "test": "jest",
-    "serve": "serve",
-    "build": "node build.js",
-    "watch": "node build.js --watch",
-    "esbuild": "esbuild ./src/*.ts --bundle --sourcemap --outdir=dist --watch",
-    "format": "prettier src/*.ts -w",
-    "deploy": "npm run build && netlify deploy --prod --site 014364fe-88d4-4aa0-9019-dd9037b5e36e",
-    "deploy:test": "npm run build && netlify deploy --prod --site 729a2630-9b25-4b84-a5f7-c5ebe5ae970e"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/sygnaltech/dev-template.git"
+    "dev": "npm --prefix web run dev --",
+    "build": "npm --prefix web run build --",
+    "check": "npm --prefix web run check --",
+    "prebuild": "npm run redirects",
+    "studio:dev": "npm --prefix studio run dev --",
+    "studio:build": "npm --prefix studio run build --",
+    "studio:deploy": "node migration-scripts/guard-production-deploy.mjs --studio && npm --prefix studio run deploy --",
+    "guard:deploy": "node migration-scripts/guard-production-deploy.mjs",
+    "deploy": "npm run guard:deploy && npm run build && wrangler deploy --config wrangler.prod.jsonc",
+    "check:deploy": "wrangler deploy --dry-run --config wrangler.prod.jsonc",
+    "extract": "node migration-scripts/extract-webflow-page.mjs",
+    "fetch:assets": "node migration-scripts/fetch-webflow-assets.mjs",
+    "localise:assets": "node migration-scripts/localise-webflow-assets.mjs",
+    "assets:check": "node migration-scripts/check-assets.mjs",
+    "verify": "node migration-scripts/verify-port.mjs",
+    "sitemap": "node migration-scripts/check-sitemap.mjs",
+    "redirects": "node migration-scripts/gen-redirects.mjs",
+    "seams": "node migration-scripts/cms-seams.mjs",
+    "wf:pull": "node migration-scripts/webflow/pull.mjs",
+    "wf:from-dump": "node migration-scripts/webflow/from-mcp-dump.mjs",
+    "sanity:convert": "node migration-scripts/sanity/convert.mjs --report",
+    "sanity:import": "node migration-scripts/sanity/import.mjs",
+    "sanity:verify": "node migration-scripts/sanity/verify.mjs",
+    "test": "node migration-scripts/sanity/test-converter.mjs && node migration-scripts/sanity/test-portable.mjs",
+    "preflight": "npm run build && npm test && npm run check && npm run verify && npm run sitemap && npm run assets:check && npm run sanity:verify",
+    "engine:build": "npm --prefix engine run build --",
+    "engine:watch": "npm --prefix engine run watch --",
+    "engine:test": "npm --prefix engine run test --"
   },
   "author": {
     "name": "Michael Wells",
@@ -23,29 +40,11 @@
     "url": "https://www.sygnal.com"
   },
   "license": "",
-  "bugs": {
-    "url": "https://github.com/sygnaltech/dev-template/issues"
-  },
-  "homepage": "https://github.com/sygnaltech/dev-template#readme",
-  "devDependencies": {
-    "@types/jest": "^29.5.12",
-    "@types/js-cookie": "^3.0.6",
-    "@types/luxon": "^3.4.2",
-    "@types/node-fetch": "^2.6.11",
-    "esbuild": "^0.15.14",
-    "jest": "^29.7.0",
-    "node-fetch": "^2.7.0",
-    "prettier": "^2.7.1",
-    "serve": "^14.1.1",
-    "ts-jest": "^29.1.4",
-    "typescript": "^4.9.3"
-  },
   "dependencies": {
-    "@sygnal/sse": "^0.1.1",
-    "csv-parse": "^5.5.6",
-    "flatpickr": "^4.6.13",
-    "js-cookie": "^3.0.5",
-    "luxon": "^3.4.4",
-    "posthog-js": "^1.165.0"
+    "jsdom": "^31.0.1",
+    "jsonc-parser": "^3.3.1"
+  },
+  "devDependencies": {
+    "wrangler": "^4.42.0"
   }
 }

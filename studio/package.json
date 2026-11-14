@@ -1,0 +1,24 @@
+{
+  "name": "lux-radiology-studio",
+  "version": "0.1.1",
+  "private": true,
+  "type": "module",
+  "description": "Sanity Studio for Lux Radiology. The production-dataset guard runs in front of `deploy` from the repository root — see the root studio:deploy script.",
+  "scripts": {
+    "dev": "sanity dev",
+    "build": "sanity build",
+    "deploy": "sanity deploy",
+    "schema:check": "sanity schema validate"
+  },
+  "dependencies": {
+    "jsonc-parser": "^3.3.1",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "sanity": "^6.23.0",
+    "styled-components": "^6.6.0"
+  },
+  "devDependencies": {
+    "@sanity/vision": "^6.23.0",
+    "typescript": "^5.9.3"
+  }
+}

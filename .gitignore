@@ -1,7 +1,34 @@
 node_modules
-.env
 .DS_STORE
 
 dist/
 .chrome-profile/
 
+# ── Secrets ──────────────────────────────────────────────────────────────────
+# No leading slash, so these match at ANY depth — studio/.env is covered by
+# the same rules as the root one.
+#
+# `.env` alone is NOT enough: git matches it as an exact filename, and
+# migration-scripts/guard-production-deploy.mjs explicitly scans .env.local,
+# .env.production and .env.production.local as well. Anything the guard reads
+# is a file that can exist, and therefore a file that can be committed.
+.env
+.env.*
+.dev.vars
+.dev.vars.*
+
+# ...but the committed templates must survive the rules above.
+!.env.example
+!.dev.vars.example
+
+# Sanity Studio build output (dist/ above only matches the directory name,
+# which does cover studio/dist and web/dist — listed for clarity).
+.sanity/
+
+# Astro
+.astro/
+
+# Wrangler's local state — miniflare's emulated KV/R2/D1/cache sqlite files
+# and the generated deploy config. Created by `astro build` (the Cloudflare
+# adapter) and by any wrangler invocation, including `--dry-run`.
+.wrangler/

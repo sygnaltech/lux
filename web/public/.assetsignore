@@ -1,0 +1,29 @@
+# Files that must NOT be served as public assets.
+#
+# Astro copies public/ verbatim into the build output, so this file lands
+# beside the built assets, which is where Wrangler reads it from.
+#
+# `wrangler deploy` REFUSES OUTRIGHT without the first two lines:
+#   X [ERROR] Uploading a Pages _worker.js directory as an asset.
+#     This could expose your private server-side code to the public Internet.
+# Both are consumed by Cloudflare before the asset layer sees a request, so
+# ignoring them costs nothing. They are listed even though this site currently
+# emits neither — §6 may introduce an on-demand route, and the failure if they
+# reappear unignored is a refused deploy at cut-over.
+_worker.js
+_routes.json
+
+# @astrojs/cloudflare writes its OWN generated wrangler config into the client
+# output directory. It is not used for deployment — the real configs are
+# wrangler.jsonc and wrangler.prod.jsonc at the repository root — but it sits
+# inside the assets directory, so unignored it is publicly fetchable at
+# /wrangler.json, listing bindings and account-shaped configuration.
+#
+# THE DUPLICATE IN THE BUILT FILE IS EXPECTED. The adapter APPENDS its own
+# entries to this file on the way into dist/client, and currently appends
+# `wrangler.json` and `.dev.vars` itself — so the built .assetsignore lists
+# wrangler.json twice. Kept here anyway: a duplicate ignore line costs
+# nothing, and the failure mode if a future adapter version stops appending it
+# is a published config, which is not worth relying on someone else's default
+# to prevent.
+wrangler.json

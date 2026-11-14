@@ -1,0 +1,48 @@
+{
+  "name": "@sygnal/lux-engine",
+  "version": "0.1.0",
+  "description": "Sygnal site engine for the Lux Radiology Webflow site — custom TypeScript/SCSS injected into the live site via jsDelivr.",
+  "private": true,
+  "main": "dist/index.js",
+  "scripts": {
+    "test": "jest",
+    "serve": "serve",
+    "build": "node build.js",
+    "watch": "node build.js --watch",
+    "esbuild": "esbuild ./src/*.ts --bundle --sourcemap --outdir=dist --watch",
+    "format": "prettier src/*.ts -w",
+    "deploy": "npm run build && netlify deploy --prod --site 014364fe-88d4-4aa0-9019-dd9037b5e36e",
+    "deploy:test": "npm run build && netlify deploy --prod --site 729a2630-9b25-4b84-a5f7-c5ebe5ae970e"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sygnaltech/dev-template.git"
+  },
+  "author": {
+    "name": "Michael Wells",
+    "email": "mike@sygnal.com",
+    "url": "https://www.sygnal.com"
+  },
+  "license": "",
+  "devDependencies": {
+    "@types/jest": "^29.5.12",
+    "@types/js-cookie": "^3.0.6",
+    "@types/luxon": "^3.4.2",
+    "@types/node-fetch": "^2.6.11",
+    "esbuild": "^0.15.14",
+    "jest": "^29.7.0",
+    "node-fetch": "^2.7.0",
+    "prettier": "^2.7.1",
+    "serve": "^14.1.1",
+    "ts-jest": "^29.1.4",
+    "typescript": "^4.9.3"
+  },
+  "dependencies": {
+    "@sygnal/sse": "^0.1.1",
+    "csv-parse": "^5.5.6",
+    "flatpickr": "^4.6.13",
+    "js-cookie": "^3.0.5",
+    "luxon": "^3.4.4",
+    "posthog-js": "^1.165.0"
+  }
+}

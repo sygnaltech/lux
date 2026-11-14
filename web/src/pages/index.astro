@@ -1,0 +1,51 @@
+---
+/**
+ * SCAFFOLD PLACEHOLDER — replaced wholesale in §3.
+ *
+ * §3 runs `npm run extract`, which writes the live pages verbatim into
+ * src/html/ plus a manifest at src/data/pages.json, and the real routes render
+ * from those. Nothing on this page survives that step, so no site content
+ * belongs here.
+ *
+ * It exists only so `astro build` has a route to emit, which is what lets the
+ * scaffold's acceptance checks — build, check, and the Wrangler production
+ * dry run — actually run before any porting has happened.
+ */
+import {WEBFLOW_SOURCE, SANITY_PROJECT_ID, SANITY_DATASET} from '../lib/project.mjs';
+---
+
+<html lang="en-NZ">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Scaffold — not yet ported</title>
+  </head>
+  <body>
+    <main>
+      <h1>Scaffold is up. Nothing is ported yet.</h1>
+
+      <p>
+        This route is a placeholder emitted by the migration scaffold (§2). The
+        real pages arrive in §3, extracted verbatim from the live site.
+      </p>
+
+      <h2>Configuration this build is reading</h2>
+      <dl>
+        <dt>Porting from</dt>
+        <dd>{WEBFLOW_SOURCE}</dd>
+
+        <dt>Sanity project</dt>
+        <dd>{SANITY_PROJECT_ID}</dd>
+
+        <dt>Sanity dataset</dt>
+        <dd>{SANITY_DATASET}</dd>
+      </dl>
+
+      <p>
+        All three come from <code>project.jsonc</code> at the repository root.
+        If any of them is wrong, that file is the only place to fix it.
+      </p>
+    </main>
+  </body>
+</html>

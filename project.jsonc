@@ -1,0 +1,88 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// Lux Radiology — the one per-site configuration file.
+//
+// Everything the migration engine cannot work without lives here, and NOTHING
+// ELSE does. Content — an address, a phone number, SEO copy — belongs in the
+// Sanity dataset, seeded once by the converter and owned by the editor
+// afterwards.
+//
+// NONE OF THESE VALUES IS A SECRET. The Sanity project id ships inside the
+// Studio bundle; a Cloudflare account id is not a credential. They are in
+// source on purpose, so a build cannot silently point at a different project
+// or publish to a different worker.
+//
+// THE TWO ACTUAL SECRETS GO IN .env, WHICH IS GITIGNORED:
+//   WEBFLOW_API_TOKEN  -> .env          (root)      read by `npm run wf:pull`
+//   SANITY_AUTH_TOKEN  -> studio/.env               read by `npm run sanity:import`
+// See .env.example and studio/.env.example for the shape.
+//
+// migration-scripts/lib/project.mjs REFUSES to run while a template
+// placeholder is still in place, and names the field. So anything left as
+// PROJECTID / SITENAME below fails immediately and by name, not at §4.
+// ─────────────────────────────────────────────────────────────────────────────
+{
+	"webflow": {
+		// The live Webflow site being ported. Canonical form, no trailing slash.
+		// The extractor fetches every page from this host and the sitemap check
+		// diffs against it. Also the site's own canonical host AFTER cut-over —
+		// the URLs are byte-identical across the switch, which is the whole
+		// point of porting rather than rebuilding.
+		//
+		// Internal-link rewriting derives BOTH hosts from this one value
+		// (luxradiology.co.nz and www.luxradiology.co.nz), because Webflow
+		// writes internal links as http://apex-no-www even on a www site.
+		"source": "https://www.luxradiology.co.nz"
+	},
+
+	"sanity": {
+		// The Sanity project. Not a secret — it ships inside the Studio bundle.
+		// Every script and both apps read it from here, so there is no second
+		// place for it to drift out of step.
+		"projectId": "8nxibxsa",
+
+		// The dataset the site reads and the deploy guard insists on. A
+		// non-production value here, or in any applicable shell/env source,
+		// blocks `npm run deploy` BEFORE the build. That refusal is the feature.
+		"dataset": "production",
+
+		// The *.sanity.studio subdomain for the hosted Studio. Must be globally
+		// unique across all of Sanity, so this is a proposal, not a fact —
+		// change it if `npm run studio:deploy` reports it taken.
+		"studioHost": "lux-radiology",
+
+		// Sanity versions its API by URL path segment, so this cannot be empty.
+		// "vX" is Sanity's own token for "always the newest API" — no date to
+		// carry forward or keep in step across the scripts, the Studio and the
+		// site's read client.
+		//
+		// The trade: on vX a Sanity release can change query behaviour without
+		// notice. Pin a "YYYY-MM-DD" date here if that becomes unacceptable.
+		"apiVersion": "vX"
+	},
+
+	"cloudflare": {
+		// Sygnal's Cloudflare account. Not a credential.
+		"accountId": "9095ee3415dc7ee4e497da2a3c8d1992",
+
+		// The zone the STAGING route below lives on. Note this is not the
+		// client's zone: luxradiology.co.nz is already on Cloudflare (its
+		// nameservers are ram/eleanor.ns.cloudflare.com), with www currently a
+		// DNS-only CNAME to cdn.webflow.com. So cut-over is a Cloudflare-side
+		// change only — no nameserver migration and no propagation wait.
+		"zone": "sygnal.cloud",
+
+		// THE STAGING ROUTE ONLY. The production route
+		// (www.luxradiology.co.nz) stays COMMENTED OUT in wrangler.prod.jsonc
+		// until an explicitly authorised cut-over — attaching the custom domain
+		// takes the hostname from Webflow the moment the deploy succeeds.
+		//
+		// This field records intent. It does not activate anything.
+		"routes": [
+			"luxradiology.sygnal.cloud"
+		],
+
+		"worker": {
+			"name": "site-luxradiology"
+		}
+	}
+}
