@@ -446,18 +446,88 @@ Formatting with `en-NZ` produces "16 April 2023" — arguably more correct for a
 clinic, and not what the published pages say. Matching the port comes first. Also set
 `timeZone: 'UTC'` or a midnight post shifts a day depending on where the build runs.
 
+## Cut-over gaps (§8)
+
+### C1. A Worker route covers ONE hostname — the apex is left dead
+
+**High.** The bare domain returned a Cloudflare error page immediately after cut-over.
+
+`{"pattern": "www.luxradiology.co.nz", "custom_domain": true}` attaches the Worker to
+`www` and nothing else. The apex record was proxied with Webflow behind it; the moment
+Webflow stopped answering for the domain, `https://luxradiology.co.nz/` returned **522**
+(origin unreachable) — and `http://` 301'd to `https://` first, so both schemes ended at
+the error.
+
+Webflow had been handling apex → www itself, so this is a regression *created by* the
+cut-over and invisible if you only test the canonical host. §8's checklist walks through
+the route, the DNS and the rollback window and never mentions the apex.
+
+The fix is a zone-level Cloudflare **Redirect Rule**, not Worker config — an assets-only
+deployment has no code in which to redirect, and adding the apex as a second
+`custom_domain` would *serve* the site on both hostnames instead of redirecting.
+
+§8 should add two steps: check the apex before cut-over to see what is answering for it,
+and assert afterwards that it 301s to the canonical host **with the path preserved** — a
+rule that drops the path sends every deep link to the homepage and looks fine on the
+homepage test.
+
+### C2. No command proves the live site is serving the build
+
+**High.** The question that matters most at cut-over has no check.
+
+§8 ends with "deploy and review on the `*.workers.dev` URL" and "click through the Studio
+desk by hand". Neither answers *is the hostname serving our artifact, or still Webflow?*
+
+`Server: cloudflare` does not answer it either — a Webflow site proxied through Cloudflare
+returns the identical header. The only conclusive test is a byte comparison of every page
+against the directory that was uploaded.
+
+**Added here** as `migration-scripts/check-live.mjs` (`npm run check:live`). It compares all
+202 pages byte-for-byte against `web/dist`, and covers the cut-over failures that are
+invisible from a browser: the dead apex (C1), private files exposed by the asset layer
+(`/wrangler.json`, `/_worker.js`, `/_server/*`), `not_found_handling` not taking effect,
+a sitemap that is not the one built, fonts that 404, and any Webflow host still referenced.
+
+It found C3 on its first run.
+
+### C3. The ported assets get no long cache
+
+**Medium.** Hidden at the CDN and paid by every browser.
+
+`@astrojs/cloudflare` injects an immutable `Cache-Control` for `/_astro/*` only. The ported
+Webflow assets live under `/wf/*` and inherited the default
+`public, max-age=0, must-revalidate` — so every page load revalidated the stylesheet, four
+fonts and the jQuery bundle. `CF-Cache-Status: HIT` made it look fine from the edge.
+
+Every file under `/wf/` is content-hashed by Webflow itself
+(`lux-radiology.shared.ae433f665.css`, `jquery-3.5.1.min.dc5e7f18c8.js`), and
+`fetch-webflow-assets` / `localise-webflow-assets` preserve those names verbatim — so a
+changed file is a changed URL, which is precisely the condition that makes `immutable`
+safe. The scaffold should ship a `public/_headers` with the `/wf/*` rule, and §5 should say
+why it is safe.
+
+### C4. `workers_dev` is never turned off
+
+**Low.** The scaffold reference sets `workers_dev: true` so the site can be reviewed on the
+`*.workers.dev` URL before the route is attached — correct, and §8 relies on it. But
+nothing in the process says to flip it afterwards, so a second hostname goes on serving the
+identical site indefinitely. Canonicals point at the real host, which limits the SEO damage,
+but it is a live duplicate nobody decided to keep. Worth a line in §8's "Then" list.
+
 ## Suggested upstream order
 
 1. **P1** — the published test. It silently deletes live URLs and nothing downstream
    notices.
-2. **E2**, **E9** — checks that cannot fail are worse than absent checks.
-3. **E5**, **E6**, **E7** — §5 is the step the skill calls non-optional, and three
+2. **C1**, **C2** — the cut-over leaves the apex dead and offers no way to prove the live
+   host is serving the new build. Both bite on the day it matters most.
+3. **E2**, **E9** — checks that cannot fail are worse than absent checks.
+4. **E5**, **E6**, **E7** — §5 is the step the skill calls non-optional, and three
    separate defects made it report local bugs as Webflow's fault.
-4. **S1**, **S2** — Astro 7 reality; S2 ambushes §3, not §2.
-5. **S4**, **S5** — one leaves secrets committable, the other commits personal data.
-6. **E1**, **E3**, **E4**, **E10**, **P2**, **P3** — each cost real time on first
+5. **S1**, **S2** — Astro 7 reality; S2 ambushes §3, not §2.
+6. **S4**, **S5** — one leaves secrets committable, the other commits personal data.
+7. **E1**, **E3**, **E4**, **E10**, **P2**, **P3**, **C3** — each cost real time on first
    encounter.
-7. Everything else — tidy-ups.
+8. Everything else — tidy-ups.
 
 > [!NOTE]
 > Once the engine fixes land upstream, re-sync `migration-scripts/` and drop the local

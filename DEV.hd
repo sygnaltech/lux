@@ -1,7 +1,47 @@
 ---
 id: 5I4Kjm1LQjtnS5PmbsxfJF
-version: 2
+format-version: 2
 ---
+
+<p></p>
+
+<p></p>
+
+<p></p>
+
+<p></p>
+
+[https://lux-radiology.sanity.studio/](https://lux-radiology.sanity.studio/)
+
+
+
+
+luxradiology.co.nz
+
+A
+
+198.202.211.1
+
+DNS only
+
+Auto
+
+
+[www.luxradiology.co.nz](http://www.luxradiology.co.nz)
+
+CNAME
+
+cdn.webflow.com
+
+DNS only
+
+Auto
+
+
+<table style="min-width: 50px;"><colgroup><col style="min-width: 25px;"><col style="min-width: 25px;"></colgroup><tbody><tr><td colspan="1" rowspan="1"><p>*luxradiology.co.nz/*</p></td><td colspan="1" rowspan="1"><p><a target="_blank" rel="noopener" class="text-current underline underline-offset-[0.15em] decoration-[0.0625em] link-current transition-colors group/link inline-flex items-center gap-[0.1875em] has-[&gt;[data-kumo-component=Badge]]:rounded-full" href="https://dash.cloudflare.com/9095ee3415dc7ee4e497da2a3c8d1992/workers/services/view/webflow-page/production/triggers">webflow-page</a></p></td></tr></tbody></table>
+
+<table style="min-width: 75px;"><colgroup><col style="min-width: 25px;"><col style="min-width: 25px;"><col style="min-width: 25px;"></colgroup><tbody><tr><td colspan="1" rowspan="1"><p><a target="_blank" rel="noopener" href="https://dev.luxradiology.co.nz/*">https://dev.luxradiology.co.nz/*</a></p></td><td colspan="1" rowspan="1"><p><a target="_blank" rel="noopener" class="text-current underline underline-offset-[0.15em] decoration-[0.0625em] link-current transition-colors group/link inline-flex items-center gap-[0.1875em] has-[&gt;[data-kumo-component=Badge]]:rounded-full" href="https://dash.cloudflare.com/9095ee3415dc7ee4e497da2a3c8d1992/workers/services/view/webflow-dev-proxy/production/triggers">webflow-dev-proxy</a></p></td><td colspan="1" rowspan="1"><p></p></td></tr><tr><td colspan="1" rowspan="1"><p>https://test.luxradiology.co.nz/*</p></td><td colspan="1" rowspan="1"><p><a target="_blank" rel="noopener" class="text-current underline underline-offset-[0.15em] decoration-[0.0625em] link-current transition-colors group/link inline-flex items-center gap-[0.1875em] has-[&gt;[data-kumo-component=Badge]]:rounded-full" href="https://dash.cloudflare.com/9095ee3415dc7ee4e497da2a3c8d1992/workers/services/view/webflow-dev-proxy/production/triggers">webflow-dev-proxy</a></p></td><td colspan="1" rowspan="1"><p></p></td></tr></tbody></table>
+
 
 Coding;
 
@@ -15,7 +55,7 @@ Testing;
 
 -   Builds and deploys to test on Netlify (10 sec)
 
--   ~Merge dev to test~
+-   ~~Merge dev to test~~
 
 [https://test.luxradiology.co.nz](https://test.luxradiology.co.nz/)
 
