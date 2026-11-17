@@ -1,0 +1,12 @@
+{
+  "version": 2,
+  "skills": {
+    "webflow-mcp": {
+      "source": "sygnaltech/webflow-skills",
+      "commit": "2e8d15471a6c4c272a7ce63df9f544f956ee8e6e",
+      "sourceType": "github",
+      "skillPath": "skills/webflow-mcp/SKILL.md",
+      "computedHash": "cc3a2215afc95088402fde51fb468d97bed91715dc39304e8d9a561008b61353"
+    }
+  }
+}

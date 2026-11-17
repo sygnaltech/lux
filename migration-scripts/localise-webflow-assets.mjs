@@ -19,7 +19,14 @@
  * WHAT IT SCANS
  *
  *   src/html/*.html      the ported page fragments (incl. src, srcset, href)
+ *   private/html/*.html  the ported PROTECTED page fragments — same thing, kept
+ *                        outside the Astro app so nothing can publish them
  *   public/wf/css/*.css  url(...) references — fonts and background graphics
+ *
+ * THE PRIVATE FRAGMENTS ARE IN THE LIST FOR A REASON WORTH STATING. A gated
+ * page is the one page nobody casually opens, so a Webflow image that stops
+ * loading there is the last breakage anyone would notice — it has no public
+ * traffic to report it and `npm run assets:check` would not look at it either.
  *
  * WHAT IT WRITES
  *
@@ -56,6 +63,14 @@ import { userAgent } from './lib/ua.mjs';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const WEB = join(ROOT, 'web');
 const HTML_DIR = join(WEB, 'src/html');
+
+/**
+ * The ported PROTECTED pages. Outside `web/` on purpose — see
+ * migration-scripts/extract-private-page.mjs — and optional, because a site
+ * with no gated pages never creates it.
+ */
+const PRIVATE_HTML_DIR = join(ROOT, 'private/html');
+
 const CSS_DIR = join(WEB, 'public/wf/css');
 const ASSET_DIR = join(WEB, 'public/wf/assets');
 
@@ -171,12 +186,20 @@ function localName(url) {
 // --- collect -----------------------------------------------------------------
 
 const htmlFiles = (await readdir(HTML_DIR)).filter((f) => f.endsWith('.html'));
+const privateHtmlFiles = (await exists(PRIVATE_HTML_DIR))
+  ? (await readdir(PRIVATE_HTML_DIR)).filter((f) => f.endsWith('.html'))
+  : [];
 const cssFiles = (await exists(CSS_DIR))
   ? (await readdir(CSS_DIR)).filter((f) => f.endsWith('.css'))
   : [];
 
 const sources = [
   ...htmlFiles.map((f) => ({ path: join(HTML_DIR, f), label: `src/html/${f}`, re: WF_IN_HTML })),
+  ...privateHtmlFiles.map((f) => ({
+    path: join(PRIVATE_HTML_DIR, f),
+    label: `private/html/${f}`,
+    re: WF_IN_HTML,
+  })),
   ...cssFiles.map((f) => ({ path: join(CSS_DIR, f), label: `public/wf/css/${f}`, re: WF_IN_CSS })),
 ];
 

@@ -4,6 +4,21 @@ node_modules
 dist/
 .chrome-profile/
 
+# ── The rendered protected pages ─────────────────────────────────────────────
+# Build artifact written by scripts/prepare-private.mjs and bundled into the
+# Worker by `main`. It holds the GATED pages' complete HTML, so committing it
+# puts content that is behind a password into git history, into every clone and
+# into every fork — where deleting it later does not help.
+#
+# The SOURCE is committed and should be: private/html/ and private/pages.json
+# are what make the build reproducible. Only the rendered output is excluded.
+#
+# `scripts/lib/gate.mjs` writes an empty `{}` here when it is missing, so a
+# clean checkout can import the Worker (and therefore run the tests) before
+# anything has been built. An empty manifest 404s every protected route, which
+# is the correct failure direction.
+worker/*.generated.json
+
 # ── Secrets ──────────────────────────────────────────────────────────────────
 # No leading slash, so these match at ANY depth — studio/.env is covered by
 # the same rules as the root one.

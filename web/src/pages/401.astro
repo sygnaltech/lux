@@ -1,0 +1,126 @@
+---
+/**
+ * The password gate, built as an ordinary static asset at `/401`.
+ *
+ * The Worker (`worker/index.mjs`) fetches this through the ASSETS binding and
+ * serves it — as HTTP 401 — at whichever protected URL the visitor asked for,
+ * so the address bar keeps the page they wanted and a shared link still works
+ * after signing in. ONE BUILT PAGE SERVES EVERY PROTECTED ROUTE, so nothing
+ * here may be route-specific.
+ *
+ * IT IS A PORT OF WEBFLOW'S OWN PASSWORD PAGE. The markup below is the
+ * `utility-page-wrap` / `w-password-page` structure Webflow served for /poac,
+ * with its asset URLs localised — so the gate is the same gate the client's
+ * visitors already knew, styled by the same stylesheet. Every class it uses is
+ * in `public/wf/css/lux-radiology.shared.*.css`; `.w-form-fail` is
+ * `display: none` there, which is what the inline script below toggles.
+ *
+ * NO `action` ATTRIBUTE, DELIBERATELY. The Worker injects the action and the
+ * hidden `returnTo` at request time (HTMLRewriter in production, a bounded
+ * String.replace on the Node paths). Setting one here would be replaced in
+ * production and would mask a broken dev shim — and Webflow's original value,
+ * `/.wf_auth`, would post to an endpoint that does not exist on this site.
+ *
+ * WEBFLOW'S RUNTIME SCRIPTS ARE OMITTED, which is the one deliberate departure
+ * from the original. jQuery and the three `lux-radiology.*.js` chunks were on
+ * Webflow's password page because Webflow puts them on every page, and the
+ * Webflow form module binds submit handlers to any `form` inside a `.w-form`
+ * wrapper. This form must perform a NATIVE POST — an intercepted, AJAXed submit
+ * would post the password to the wrong place and silently never sign anybody in.
+ * Nothing visual depends on them: the gate is CSS and one native form.
+ *
+ * It does NOT use BaseLayout, for the same reason `404.astro` does not — that
+ * component resolves its furniture through the extractor's manifest, and `/401`
+ * has no manifest entry because it is not a ported content page. The shared
+ * head fragment is used directly instead.
+ *
+ * NOT IN THE SITEMAP: it is not in the extractor's manifest, which is what
+ * `sitemap.xml.ts` enumerates.
+ */
+const fragments = import.meta.glob<string>('../html/*.html', {
+  query: '?raw',
+  import: 'default',
+  eager: true,
+});
+
+const frag = (name: string): string => fragments[`../html/${name}`] ?? '';
+
+/** Same Webflow-CDN preconnect removal as BaseLayout — see the note there. */
+const headCustom = frag('head-custom.html').replace(
+  /\s*<link[^>]*href="https:\/\/cdn\.prod\.website-files\.com"[^>]*>/g,
+  '',
+);
+
+if (!headCustom) {
+  throw new Error(
+    '401.astro: head-custom.html is missing. Run `npm run extract` before building.',
+  );
+}
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lux Radiology</title>
+
+    {/* A gate must never be indexed, and neither must the URL it is served at. */}
+    <meta name="robots" content="noindex, nofollow" />
+
+    {/*
+      Self-referential canonical.
+
+      `npm run sitemap` asserts every built page carries one, and the failure
+      that check exists for is a page canonicalising to a DIFFERENT page. A gate
+      inheriting a content page's canonical would be exactly that. Inert in
+      practice on a noindex page, so it satisfies the gate without making a
+      claim.
+    */}
+    <link href="https://www.luxradiology.co.nz/401" rel="canonical" />
+
+    <Fragment set:html={headCustom} />
+  </head>
+
+  <body>
+    <div class="utility-page-wrap">
+      <div class="utility-page-content w-password-page w-form">
+        {/* action and the hidden returnTo are injected by the Worker. */}
+        <form method="post" id="email-form" name="email-form" data-name="Email Form" class="utility-page-form w-password-page">
+          <img src="/wf/assets/612de59c5bd9de56f312f085_favicon-256.png" alt="" />
+          <h2>Lux Radiology</h2>
+          <div class="div-block-29">
+            <input
+              class="text-field-3 w-password-page w-input"
+              autofocus
+              maxlength="256"
+              name="pass"
+              data-name="field"
+              placeholder="Enter your password"
+              type="password"
+              autocomplete="current-password"
+              required
+              id="field"
+            />
+            <input type="submit" class="submit-button-2 w-password-page w-button" value="Login" />
+          </div>
+          <div class="w-password-page w-form-fail">
+            <div>Incorrect password. Please try again.</div>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    {/*
+      A failed login returns the visitor here with ?e=1 — the same marker
+      Webflow used, matched the same way, so the error state is the one the
+      client's visitors already saw. The page is static, so the marker can only
+      be read in the browser; reading it in the frontmatter would bake the
+      build-time answer into the HTML.
+    */}
+    <script is:inline>
+      if (/[?&]e=1(&|$)/.test(document.location.search)) {
+        document.querySelector('.w-password-page.w-form-fail').style.display = 'block';
+      }
+    </script>
+  </body>
+</html>

@@ -32,6 +32,11 @@ export const REDIRECTS = [
   //   to: '/<base-path>/<new-slug>',
   //   why: 'why this URL is not being carried across',
   // },
+  {
+    from: '/services/3d4d',
+    to: '/3d4d',
+    why: 'Hand-typed link in the Pregnancy Ultrasound service copy that never resolved — there is no service with that slug, and the page it meant is the standalone /3d4d. The CMS link is fixed, so nothing on the site emits this URL any more; the 301 is for anything already out in the wild that followed it.',
+  },
 ];
 
 export const STATUS = 301;

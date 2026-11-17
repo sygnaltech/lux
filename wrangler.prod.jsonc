@@ -27,16 +27,48 @@
 	"account_id": "9095ee3415dc7ee4e497da2a3c8d1992",
 
 	"compatibility_date": "2026-11-10",
+
+	// `nodejs_compat` is REQUIRED, not optional, now that there is a Worker:
+	// the gate uses node:crypto's timingSafeEqual and fails at import without
+	// it. It predates the gate, so nothing had to change here — but do not
+	// remove it on the grounds that nothing visible uses it.
 	"compatibility_flags": ["nodejs_compat"],
 
 	// Staging review happens on the *.workers.dev URL with the route still
 	// commented out. Keep this true until after cut-over.
 	"workers_dev": false,
 
-	// NO "main". `output: 'static'` with no on-demand route emits an empty
-	// dist/server — there is no Worker, and this is an assets-only deployment.
-	// If §6 adds `prerender = false` anywhere, wire the generated Worker here
-	// AND remove `not_found_handling` below, in the same change.
+	// THE GATE — and the one structural change this config has had since
+	// cut-over. Astro still emits no Worker of its own (every route
+	// prerenders, dist/_server is empty); this entrypoint is ours.
+	//
+	// It exists because Webflow's per-page password does not survive an export.
+	// /poac was protected on the Webflow site and is absent from Webflow's
+	// sitemap — which is where the §1 inventory came from, so the inventory
+	// missed it and this config went live answering a real URL with our own
+	// 404. The Worker serves that page from inside its own bundle, so the HTML
+	// is never published as a static asset and never cacheable at the edge.
+	//
+	// MUST STAY IN STEP WITH wrangler.jsonc. A gate that only exists in
+	// production is untested until the moment it matters.
+	"main": "worker/index.mjs",
+
+	// Secret NAMES, never values. A deploy fails fast if either is unset, which
+	// is the correct failure: without the password every protected route 401s
+	// and the login endpoint 503s, so a missing secret locks the page rather
+	// than opening it — but failing at deploy is better than discovering it
+	// from a client who cannot get in.
+	//
+	//   wrangler secret put PRIVATE_PAGE_PASSWORD  --config wrangler.prod.jsonc
+	//   wrangler secret put PRIVATE_SESSION_SECRET --config wrangler.prod.jsonc
+	//
+	// PRIVATE_SESSION_SECRET must be >= 32 chars and randomly generated; the
+	// login handler refuses to issue a session otherwise. Rotating
+	// PRIVATE_PAGE_PASSWORD is also the log-everybody-out switch, because the
+	// signing key is derived from both.
+	"secrets": {
+		"required": ["PRIVATE_PAGE_PASSWORD", "PRIVATE_SESSION_SECRET"]
+	},
 
 	"routes": [
 		{
@@ -53,14 +85,37 @@
 		// web/public/.assetsignore.
 		"directory": "./web/dist",
 
+		// The Worker fetches /401 through this binding to build the gate page.
+		// It reads the asset store DIRECTLY and does not re-enter the Worker, so
+		// there is no recursion to guard against.
+		"binding": "ASSETS",
+
+		// A LIST, NOT `true` — see the long note in wrangler.jsonc, which this
+		// must match exactly. Three paths route to the Worker; all 202 public
+		// URLs keep the asset-first behaviour they have today, including
+		// _redirects, _headers and the 404 page below.
+		//
+		// MUST BE KEPT IN STEP WITH worker/index.mjs: PREFIX and LOGIN there,
+		// these three patterns here. A path the Worker claims but this list
+		// omits is a path the gate silently never sees — and `run_worker_first`
+		// is the setting the pattern's own gotchas list first, because omitting
+		// it makes the gate appear to work while failing open.
+		"run_worker_first": ["/poac", "/poac/*", "/api/private/login"],
+
 		// Correct ONLY while every route prerenders — verified by there being
-		// no `prerender = false` in web/src and an empty dist/server.
+		// no `prerender = false` in web/src and an empty dist/_server — AND
+		// because `run_worker_first` above is a list that excludes the
+		// protected paths.
 		//
 		// Without it, Cloudflare answers unmatched paths with its own bare 404
-		// and the ported 404 page is never served. WITH it, on an on-demand
-		// site, the asset layer intercepts before the Worker runs. The setting
-		// that is right here is wrong on a site with any server route, and the
-		// symptom is silent either way. Re-check at §8.
+		// and the ported 404 page is never served. WITH it, on a site whose
+		// Worker renders routes on demand, the asset layer intercepts before
+		// the Worker runs. The setting that is right here is wrong on a site
+		// with any server route, and the symptom is silent either way.
+		//
+		// It is also what made the missing /poac look like an ordinary dead
+		// link rather than a dropped page: the URL answered with a plausible,
+		// branded 404 instead of anything that said "this used to exist".
 		"not_found_handling": "404-page"
 	}
 }

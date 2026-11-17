@@ -14,13 +14,32 @@
 
 	"name": "site-luxradiology-local",
 	"compatibility_date": "2026-11-10",
+
+	// `nodejs_compat` is REQUIRED, not optional, now that there is a Worker:
+	// the gate uses node:crypto's timingSafeEqual and fails at import without
+	// it. It predates the gate, so nothing had to change here — but do not
+	// remove it on the grounds that nothing visible uses it.
 	"compatibility_flags": ["nodejs_compat"],
 
-	// NO "main". `output: 'static'` with no on-demand route emits an empty
-	// dist/server — there is no Worker. This is an assets-only deployment.
-	// If §6 ever adds `prerender = false` to a route, a Worker entrypoint
-	// appears and must be wired up here AND in the production config, and
-	// `not_found_handling` must come out of both. See §8.
+	// THE GATE. Astro still emits no Worker of its own — every route
+	// prerenders, so dist/_server stays empty — and this entrypoint is ours,
+	// not the adapter's. It exists for ONE job: serving /poac, the page Webflow
+	// had behind a password, from inside the bundle so its HTML is never
+	// published as a static asset. See worker/index.mjs and
+	// scripts/prepare-private.mjs.
+	//
+	// If §6 ever adds `prerender = false` to a route, the adapter DOES emit a
+	// Worker, and the two are then two entries for one slot: this one wins and
+	// the adapter's dist/_worker.js is ignored. That needs the gate to delegate
+	// to it rather than to env.ASSETS, which is a real change, not a config
+	// tweak.
+	"main": "worker/index.mjs",
+
+	// Secret NAMES, never values — a value in a committed config is a leak
+	// whatever it is named. A deploy fails fast if either is unset.
+	"secrets": {
+		"required": ["PRIVATE_PAGE_PASSWORD", "PRIVATE_SESSION_SECRET"]
+	},
 
 	"assets": {
 		// Flat by configuration, not by default: astro.config.mjs sets
@@ -30,11 +49,46 @@
 		// web/public/.assetsignore.
 		"directory": "./web/dist",
 
-		// Correct ONLY because every route prerenders. The asset layer answers
-		// "404-page" BEFORE any Worker runs, so with an on-demand route this
-		// would intercept exactly the paths the Worker exists to render. The
-		// skill reports a site that shipped the opposite mistake and served a
-		// 404 page that could never appear.
+		// The Worker fetches /401 through this binding to build the gate page.
+		// It reads the asset store DIRECTLY and does not re-enter the Worker, so
+		// there is no recursion to guard against.
+		"binding": "ASSETS",
+
+		// A LIST, NOT `true`, AND THE LIST IS THE POINT.
+		//
+		// Default asset routing answers any request matching a file in
+		// web/dist without ever invoking the Worker — so without this the gate
+		// is bypassed for every route that has an asset, and `true` is the
+		// pattern's default remedy. A list is better here because exactly three
+		// paths need the Worker:
+		//
+		//   /poac    the protected page. Has no asset — that is the design — so
+		//            the asset layer would answer it with the 404 page below.
+		//   /poac/*  anything beneath it, so the manifest (the allowlist) gets
+		//            to 404 it rather than the asset layer. Nothing is there
+		//            today; it is listed so adding a second protected page is a
+		//            one-line change in scripts/private-pages.config.mjs.
+		//   the login endpoint. No asset either, so it would 404 too.
+		//
+		// Everything else keeps the behaviour it has today, untouched: the
+		// asset layer's own _redirects, _headers and not_found_handling, with
+		// no Worker invocation and no Worker in the path of a cached hit. With
+		// `true`, every public request would route through the gate's
+		// fallthrough instead — correct, but it puts a Worker in front of 202
+		// pages to protect one.
+		//
+		// MUST BE KEPT IN STEP WITH worker/index.mjs: PREFIX and LOGIN there,
+		// these three patterns here. A path the Worker claims but this list
+		// omits is a path the gate silently never sees.
+		"run_worker_first": ["/poac", "/poac/*", "/api/private/login"],
+
+		// Correct ONLY because every route prerenders — AND because
+		// `run_worker_first` above is a list that excludes the protected paths.
+		// The asset layer answers "404-page" before the Worker runs, so on a
+		// site where the Worker renders routes on demand this would intercept
+		// exactly the paths it exists for. The skill reports a site that
+		// shipped the opposite mistake and served a 404 page that could never
+		// appear.
 		"not_found_handling": "404-page"
 	}
 }

@@ -1,0 +1,17 @@
+{
+  "extractedFrom": "https://www.luxradiology.co.nz",
+  "pages": {
+    "poac": {
+      "route": "/poac",
+      "webflowPath": "/poac",
+      "wfPage": "670e27bd44f843f52c7bd1f0",
+      "lang": "en",
+      "title": "POAC",
+      "description": "Comprehensive diagnostic ultrasound & x-ray services in the Auckland CBD.",
+      "ogTitle": "POAC",
+      "ogDescription": "Comprehensive diagnostic ultrasound & x-ray services in the Auckland CBD.",
+      "shell": "full",
+      "headExtra": true
+    }
+  }
+}

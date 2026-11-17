@@ -178,6 +178,23 @@ const SOURCE_HOST = new URL(WEBFLOW_SOURCE).hostname.toLowerCase();
 const APEX = SOURCE_HOST.replace(/^www\./, '');
 export const WEBFLOW_DOMAINS = [APEX, `www.${APEX}`];
 
+/**
+ * Webflow's `*.webflow.io` staging host, for the ONE job `WEBFLOW_SOURCE`
+ * cannot do: reading a PASSWORD-PROTECTED page.
+ *
+ * Optional, and absent is a normal state — a site with no protected pages
+ * never needs it. `extract-private-page.mjs` is the only reader and it fails by
+ * name if it is missing.
+ *
+ * Deliberately NOT folded into WEBFLOW_DOMAINS. That list decides which links
+ * count as internal when rewriting rich text, and the staging host must not be
+ * on it: a `lux-radiology.webflow.io/...` URL in Webflow content is a mistake
+ * worth seeing, not a link to silently relativise.
+ */
+export const WEBFLOW_STAGING = optional('webflow.staging')
+  ? String(optional('webflow.staging')).replace(/\/+$/, '')
+  : null;
+
 /** Matches an absolute URL on any of the site's own hosts, capturing the path. */
 export const INTERNAL_LINK = new RegExp(
   `^https?://(?:${WEBFLOW_DOMAINS.map((d) => d.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})(/.*)?$`,

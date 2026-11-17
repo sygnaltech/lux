@@ -1,0 +1,47 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Root .dev.vars — template. Copy to `.dev.vars` and fill in. `.dev.vars` is
+# gitignored.
+#
+# This file is committed and must NEVER hold a real value.
+#
+# These two are WORKER SECRETS, not build configuration, and they are a
+# different mechanism from .env:
+#
+#   .env       read by Node at build time (the migration scripts, Vite)
+#   .dev.vars  read by `wrangler dev` and by web/src/middleware.js, and it is
+#              the LOCAL stand-in for `wrangler secret put`
+#
+# In every deployed environment they come from Cloudflare, never from a file:
+#
+#   wrangler secret put PRIVATE_PAGE_PASSWORD  --config wrangler.prod.jsonc
+#   wrangler secret put PRIVATE_SESSION_SECRET --config wrangler.prod.jsonc
+#
+# Both configs declare them under `secrets.required`, so a deploy fails fast
+# while either is unset.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# The password visitors type at the /poac gate.
+#
+# Read by worker/index.mjs. Non-empty; while it is absent every protected route
+# answers 401 and the login endpoint answers 503, so a missing value LOCKS the
+# page rather than opening it.
+#
+# It is part of the session signing key, so CHANGING IT SIGNS EVERYBODY OUT
+# IMMEDIATELY. That is the only revocation a shared password has.
+#
+# Hand it to the client out of band — not in this repo, not in a commit
+# message, not in the Sanity dataset, not in a ticket.
+PRIVATE_PAGE_PASSWORD=
+
+# HMAC signing material for the session cookie. Read by worker/index.mjs.
+#
+# MUST BE AT LEAST 32 CHARACTERS and randomly generated — the login handler
+# answers 503 rather than issuing a session otherwise. Generate it, never
+# compose it:
+#
+#   openssl rand -base64 32
+#
+# NEVER derive it from the password, and never reuse it between environments.
+# Nothing secret rides in the cookie (the signed payload is only the expiry),
+# so this value's whole job is to make a forged cookie impossible.
+PRIVATE_SESSION_SECRET=

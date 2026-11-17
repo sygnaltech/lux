@@ -44,6 +44,7 @@
 import { JSDOM } from 'jsdom';
 
 import { INTERNAL_LINK } from '../lib/project.mjs';
+import { redirectFor } from '../redirects.config.mjs';
 
 /** Decorators this schema allows. Anything else is reported and ignored. */
 const DECORATORS = {
@@ -189,11 +190,22 @@ export function toPortableText(html, { onWarn = () => {} } = {}) {
    * The host list is derived from `webflow.source` in project.jsonc — both the
    * apex and the www form, because Webflow uses the apex regardless of which
    * one the site is served from.
+   *
+   * A root-relative path is then run through the redirect table, so a link the
+   * editor typed at a URL we are 301'ing lands on the destination directly.
+   * Read from redirects.config.mjs rather than restated, for the same reason
+   * `slugFor` reads it: the link and the 301 cannot then disagree.
+   *
+   * WHY IN THE CONVERTER AND NOT ONLY IN SANITY. `sanity:import` runs with
+   * `--replace` over deterministic ids, so a corrected href patched into the
+   * dataset by hand is overwritten by the next convert-and-import — the raw
+   * Webflow dump still holds the typo, and it wins. Fixing it here is what
+   * makes the correction survive a re-import.
    */
   function normaliseHref(href) {
     const internal = INTERNAL_LINK.exec(href.trim());
-    if (internal) return internal[1] || '/';
-    return href.trim();
+    const path = internal ? internal[1] || '/' : href.trim();
+    return redirectFor(path) ?? path;
   }
 
   /** Build one text block from a block-level element. */

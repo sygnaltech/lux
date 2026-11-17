@@ -1,0 +1,5 @@
+[mcp_servers.sanity-lux]
+url = "https://mcp.sanity.io"
+
+[mcp_servers.webflow-lux]
+url = "https://mcp.webflow.com/mcp"

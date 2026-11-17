@@ -31,7 +31,27 @@
 		// Internal-link rewriting derives BOTH hosts from this one value
 		// (luxradiology.co.nz and www.luxradiology.co.nz), because Webflow
 		// writes internal links as http://apex-no-www even on a www site.
-		"source": "https://www.luxradiology.co.nz"
+		"source": "https://www.luxradiology.co.nz",
+
+		// Webflow's own *.webflow.io staging host for this site.
+		//
+		// ONLY ONE THING READS THIS, and it is the one thing that cannot use
+		// `source` above: `npm run extract:private`, which ports Webflow's
+		// PASSWORD-PROTECTED pages. Two reasons it has to come from here.
+		//
+		//   1. A protected page is not readable without passing Webflow's
+		//      password gate, and that gate (`POST /.wf_auth`) exists on the
+		//      staging host whether or not the custom domain is still attached.
+		//   2. After cut-over, `source` IS THIS SITE. Fetching /poac from it
+		//      returns our own 404, which is exactly the bug that made this
+		//      page necessary — so the one host that still has the Webflow
+		//      original must be named separately.
+		//
+		// NOT A SECRET and not a fallback: nothing else fetches it, and the
+		// ported pages' canonical URLs still point at `source`. Webflow serves
+		// this host for as long as the project exists, which is the rollback
+		// window §7 asked for.
+		"staging": "https://lux-radiology.webflow.io"
 	},
 
 	"sanity": {
