@@ -6,17 +6,25 @@
       "headers": {
         "X-MCP-API-Key": "mcp_pHHWnuitSCElWCMaMcdNEIKZB8YorupZ"
       }
-    }, 
+    },
     "chrome-devtools": {
       "command": "npx",
-      "args": ["-y", "chrome-devtools-mcp@latest", 
-        "--userDataDir=d:/Projects/Clients/lux/.chrome-profile", 
+      "args": [
+        "-y",
+        "chrome-devtools-mcp@latest",
+        "--userDataDir=d:/Projects/Clients/lux/.chrome-profile",
         "--ignoreDefaultChromeArg=--enable-automation",
         "--chromeArg=--disable-blink-features=AutomationControlled",
         "--ignoreDefaultChromeArg=--disable-extensions"
       ]
+    },
+    "sanity-lux": {
+      "type": "http",
+      "url": "https://mcp.sanity.io"
+    },
+    "webflow-lux": {
+      "type": "http",
+      "url": "https://mcp.webflow.com/mcp"
     }
   }
-}    
-
-
+}
