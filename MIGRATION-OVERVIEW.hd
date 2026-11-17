@@ -1,0 +1,98 @@
+---
+id: 2hygyjQBpzDZ41NUyrFAJH
+title: "Migration Overview"
+format-version: 2
+date: 2026-11-17
+---
+
+# Migration Overview
+
+Webflow → Astro + Sanity on Cloudflare. Status as at 2026-11-17.
+
+## 1. Reconnaissance
+
+- [x] URL inventory reconciled — 23 paths = 18 static + 5 CMS templates
+- [x] Shell identified (nav + footer punched out to `<!--wf:nav-->` / `<!--wf:footer-->`)
+- [x] Forms confirmed third-party (jotform, usebasin, zapier, carepatron) — survive cut-over
+- [x] No password-protected pages on this site
+- [ ] POAC page missed in the inventory — never ported
+
+## 2. Scaffold
+
+- [x] `web/` + `studio/` + root orchestration
+- [x] `project.jsonc` as sole config source, readers in all three runtimes
+- [x] Both Wrangler configs
+- [x] `.assetsignore` shipped
+- [x] All four root commands exist with working targets
+- [x] Production deploy guards in place
+
+## 3. Static pages
+
+- [x] 18 pages extracted and ported verbatim
+- [x] Structural verifier written (`npm run verify`)
+- [x] Titles stored decoded, escaped once on output
+- [x] 404 page guarded against middleware substitution
+
+## 4. CMS
+
+- [x] Collections discovered and field schemas dumped
+- [x] Raw pull committed to `migration/raw/`
+- [x] Converter written, deterministic keys, fixtures in place
+- [x] 11 document types converted — 299 documents
+- [x] Dataset imported and verified against raw dump
+- [x] References pruned against live id set
+
+## 5. Assets
+
+- [x] CSS/JS bundles fetched
+- [x] All assets localised — 115 files in `dist/wf/assets`
+- [x] Fonts local
+- [x] `assets:check` passes — site does not need the Webflow account
+
+## 6. CMS routes
+
+- [x] `/services/[slug]`
+- [x] `/category/[slug]`
+- [x] `/post/[slug]`
+- [x] `/reviews/[slug]`
+- [x] `/team/[slug]`
+- [x] Images bound per item, not per sample
+- [x] Portable Text rendered into `.w-richtext`
+- [ ] `/poac` route — 14 documents in Sanity, no page renders them *(in progress — PM)*
+
+## 7. Sitemap, robots, redirects
+
+- [x] Sitemap generated from the same sources the routes use
+- [x] `/404` excluded
+- [x] `lastmod` only on CMS documents
+- [x] Redirects single-sourced from `redirects.config.mjs`
+- [ ] Redirect `/services/3d4d` → `/3d4d` added but **not yet deployed** (live returns 404)
+
+## 8. Cut over
+
+- [x] Deploy dry-run validated
+- [x] DNS confirmed Cloudflare-side
+- [x] Reviewed on `*.workers.dev`
+- [x] Route attached — production live
+- [x] Studio deployed (`lux-radiology`)
+- [ ] Studio desk clicked through by a human
+
+## 9. Gates
+
+- [x] `npm run verify` — structure
+- [x] `npm test` — converter loses no visible character
+- [x] `npm run sanity:verify` — dataset matches raw dump
+- [x] `npm run assets:check` — no Webflow dependency
+- [x] `npm run check` — 0 errors, 0 warnings, 0 hints
+- [ ] `npm run sitemap` — now compares against our own deployed site, so no longer a live-vs-port check
+
+## 10. Open
+
+- [ ] **Routes are fully prerendered — no route sets `prerender = false`.** CMS edits do not appear until a rebuild and redeploy
+- [ ] `/poac` page *(in progress — PM)*
+- [ ] Deploy pending: 3D4D link fix + its redirect are in Sanity and config but not in the live build
+- [ ] `schema/index.mjs` absent from the scaffold
+- [ ] Studio desk not yet walked by hand
+- [ ] Google Fonts still external (known, survives cut-over)
+- [ ] Webflow JS runtime shipped as-is (known, replacing it is a redesign)
+- [ ] Static-page prose stays in HTML — not editable without a deploy
