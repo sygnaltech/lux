@@ -1,0 +1,70 @@
+---
+id: 3ahkD0OLRyIKRvEaDbPT0p
+title: Deploy — v0.1.3
+format-version: 2
+date: '2026-11-17T00:00:00.000Z'
+description: Production deploy runbook for Lux Radiology v0.1.3.
+tags:
+  - deploy
+  - prod
+  - runbook
+---
+
+# Deploy — v0.1.3
+
+Ships the `/poac` password gate: the site's first Worker, and the first deploy that will be refused outright until two secrets exist. No dataset change — the Sanity dataset is untouched, and the 3D4D link fix this release also carries is already live in it.
+
+## Deploy
+
+-   **1.** No backup step. This release writes nothing to the Sanity dataset, and the rollback target is the Worker version currently deployed, which Cloudflare retains.
+
+> [!CAUTION]
+> Both secrets must exist before step **4**. `wrangler.prod.jsonc` declares them under `secrets.required`, so the deploy is refused while either is unset. Rotating `PRIVATE_PAGE_PASSWORD` later signs every open session out immediately — it is part of the cookie signing key.
+
+- [x] **2.** Set the shared password visitors type at the `/poac` gate, then hand it to the client out of band — not in the repo, not in a ticket, not in the Sanity dataset.
+
+```bash
+wrangler secret put PRIVATE_PAGE_PASSWORD --config wrangler.prod.jsonc
+```
+
+- [x] **3.** Set the session signing secret. Paste at least 32 randomly generated characters — `openssl rand -base64 32` — never derived from the password; the login handler answers 503 rather than issuing a session if it is shorter. o0KWbfjYg7WbFC7phOBPXtB49J1j7BXl4bx7zxoR9hs=
+
+```bash
+wrangler secret put PRIVATE_SESSION_SECRET --config wrangler.prod.jsonc
+```
+
+- [x] **4.** Build and deploy. The build renders the gated page into the Worker bundle, and refuses to write anything if a protected route or any of its copy reached `web/dist`.
+
+```bash
+npm run deploy
+```
+
+- [ ] **5.** Confirm the site still serves and the gate is closed: expect `200` for `/` and `401` for `/poac`. A `404` on `/poac` means the Worker is not in front of the route; a `200` means the gate failed open. Either one is a rollback.
+
+```bash
+curl -s -o /dev/null -o /dev/null -w "%{url_effective} %{http_code}\n" https://www.luxradiology.co.nz/ https://www.luxradiology.co.nz/poac
+```
+
+- [x] **6.** Tag the release.
+
+```bash
+git tag -a v0.1.3 -m "Release 0.1.3 — /poac restored behind a Worker password gate"
+```
+
+- [x] **7.** Push the tag.
+
+```bash
+git push origin v0.1.3
+```
+
+## If it goes wrong
+
+Fully reversible, and there is nothing to restore — the release changes no data. Rolling the Worker back returns `/poac` to the 404 it was serving before it.
+
+- [ ] **1.** Roll back to the previous Worker version. Wrangler lists the recent versions and asks which to restore; take the one deployed before 0.1.3.
+
+```bash
+wrangler rollback --config wrangler.prod.jsonc -m "rollback 0.1.3"
+```
+
+-   **2.** Leave both secrets in place. Nothing reads them once the gate is gone, and keeping them means a re-deploy needs no re-entry.
