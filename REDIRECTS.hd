@@ -1,0 +1,41 @@
+---
+id: 65fycWoxoUGgfyt8WXyREW
+title: "Redirects"
+format-version: 2
+date: 2026-11-19
+---
+
+# Redirects
+
+The redirect table published by the Webflow site, as read from
+`https://lux-radiology.webflow.io/manifest.json` (publish version 142, 2026-11-20),
+and how each entry was ported into this site.
+
+The ported site's source of truth is `migration-scripts/redirects.config.mjs`,
+which generates `web/public/_redirects` (served by Cloudflare's asset layer before
+the Worker runs). All 12 Webflow redirects are ported; 4 are re-pointed because
+Webflow's own destination does not exist — two of them 404 on the live Webflow
+site as well.
+
+| From | Webflow sent to | Ported as | Note |
+| --- | --- | --- | --- |
+| `/confirm` | `/c` | `/c` | verbatim |
+| `/scan-planner` | `/scan` | `/scan` | verbatim |
+| `/services/ultrasound-maternity` | `/services/pregnancy-scan` | `/services/pregnancy-scan` | verbatim |
+| `/reviews/alexandria-ahchee` | `/reviews` | `/reviews` | verbatim |
+| `/blog` | `/` | `/` | verbatim |
+| `/loc/582-k-road` | `/contact` | `/contact` | verbatim |
+| `/loc/195-ponsonby-rd` | `/contact` | `/contact` | verbatim |
+| `/maternity` | `/scan-planner` | `/scan` | flattened — Webflow chained `/maternity` → `/scan-planner` → `/scan` one hop at a time |
+| `/team/ginny-frame` | `/team/ginny` | `/about` | re-pointed — `/team/ginny` 404s even on Webflow, and no `/team` index exists; the team is presented on `/about` |
+| `/poac-liver` | `/liver` | `/poac` | re-pointed — `/liver` does not exist anywhere; POAC referrer content lives behind the gated `/poac` |
+| `/test/test-book-now` | `/test/book` | `/book` | re-pointed — the `/test/*` pages were deliberately not ported |
+| `/test/modal` | `/test/modals` | `/book` | re-pointed — same; the modals under test were the booking popups |
+
+> [!IMPORTANT]
+> `redirects.config.mjs` is the single source of truth. Never edit
+> `web/public/_redirects` by hand — regenerate it with
+> `node migration-scripts/gen-redirects.mjs` (also runs as `prebuild`).
+> The config also carries the site's own `/services/3d4d` → `/3d4d` entry,
+> which is not from the Webflow table.
+

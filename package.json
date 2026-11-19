@@ -1,6 +1,6 @@
 {
   "name": "lux-radiology",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "private": true,
   "description": "Lux Radiology — Webflow to Astro + Sanity migration. This root package is an ORCHESTRATOR: it owns the migration engine, both Wrangler configs and the deploy guards, and delegates app commands to web/ and studio/.",
   "type": "module",
