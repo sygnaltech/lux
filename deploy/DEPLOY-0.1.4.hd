@@ -1,0 +1,51 @@
+---
+id: 2qMsWL0jxutrQ3tVyZQm7c
+title: Deploy — v0.1.4
+format-version: 2
+date: '2026-11-20T00:00:00.000Z'
+description: Production deploy runbook for Lux Radiology v0.1.4.
+tags:
+  - deploy
+  - prod
+  - runbook
+---
+
+# Deploy — v0.1.4
+
+Ships the Webflow redirect table (12 ported 301s in `_redirects`, static assets only). No migrations and the Sanity dataset is untouched, so no backup is needed and rollback is code-only.
+
+## Deploy
+
+- [x] **1.** Deploy. The guard runs first, the build regenerates `web/public/_redirects` from the config via `prebuild`, then Wrangler publishes Worker + assets.
+
+```bash
+npm run deploy
+```
+
+- [ ] **2.** Critical check: an old URL must answer with the new 301. Expect `HTTP/2 301` with `location: /c` — a 404 here means the redirects did not ship; stop and roll back.
+
+```bash
+curl -sI https://www.luxradiology.co.nz/confirm
+```
+
+- [x] **3.** Tag the release.
+
+```bash
+git tag -a v0.1.4 -m "Release 0.1.4 — port Webflow redirect table"
+```
+
+- [x] **4.** Push the tag.
+
+```bash
+git push origin v0.1.4
+```
+
+## If it goes wrong
+
+-   **1.** Fully reversible: this release writes no data, so rolling back the deployment is the whole rollback.
+
+- [ ] **2.** Roll back to the previously deployed version (Worker and assets together).
+
+```bash
+wrangler rollback --config wrangler.prod.jsonc
+```
